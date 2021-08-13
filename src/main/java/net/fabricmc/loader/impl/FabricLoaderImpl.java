@@ -44,7 +44,7 @@ import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.impl.discovery.ArgumentModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ClasspathModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.DirectoryModCandidateFinder;
-import net.fabricmc.loader.impl.discovery.ModCandidate;
+import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
 import net.fabricmc.loader.impl.discovery.ModResolver;
@@ -78,7 +78,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	private static final String TMP_DIR_NAME = "tmp"; // relative to cache dir
 
 	protected final Map<String, ModContainerImpl> modMap = new HashMap<>();
-	private List<ModCandidate> modCandidates;
+	private List<ModCandidateImpl> modCandidates;
 	protected List<ModContainerImpl> mods = new ArrayList<>();
 
 	private final Map<String, LanguageAdapter> adapterMap = new HashMap<>();
@@ -96,7 +96,13 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 	private Path gameDir;
 	private Path configDir;
 
+	private ModDiscoverer discoverer;
+
 	private FabricLoaderImpl() { }
+
+	boolean isFrozen() {
+		return frozen;
+	}
 
 	/**
 	 * Freeze the FabricLoader, preventing additional mods from being loaded.
@@ -107,6 +113,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		}
 
 		frozen = true;
+		discoverer = null;
 		finishModLoading();
 	}
 
@@ -179,6 +186,10 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		return getConfigDir().toFile();
 	}
 
+	ModDiscoverer getDiscoverer() {
+		return discoverer;
+	}
+
 	public void load() {
 		if (provider == null) throw new IllegalStateException("game provider not set");
 		if (frozen) throw new IllegalStateException("Frozen - cannot load additional mods!");
@@ -201,12 +212,12 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		// discover mods
 
-		ModDiscoverer discoverer = new ModDiscoverer(versionOverrides, depOverrides);
+		discoverer = new ModDiscoverer(versionOverrides, depOverrides);
 		discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
 		discoverer.addCandidateFinder(new DirectoryModCandidateFinder(gameDir.resolve("mods"), remapRegularMods));
 		discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
 
-		Map<String, Set<ModCandidate>> envDisabledMods = new HashMap<>();
+		Map<String, Set<ModCandidateImpl>> envDisabledMods = new HashMap<>();
 		modCandidates = discoverer.discoverMods(this, envDisabledMods);
 
 		// dump version and dependency overrides info
@@ -227,7 +238,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		StringBuilder modListText = new StringBuilder();
 
-		for (ModCandidate mod : modCandidates) {
+		for (ModCandidateImpl mod : modCandidates) {
 			if (modListText.length() > 0) modListText.append('\n');
 
 			modListText.append("\t- ");
@@ -267,8 +278,8 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		if (modsToLoadLate != null) {
 			for (String modId : modsToLoadLate.split(",")) {
-				for (Iterator<ModCandidate> it = modCandidates.iterator(); it.hasNext(); ) {
-					ModCandidate mod = it.next();
+				for (Iterator<ModCandidateImpl> it = modCandidates.iterator(); it.hasNext(); ) {
+					ModCandidateImpl mod = it.next();
 
 					if (mod.getId().equals(modId)) {
 						it.remove();
@@ -281,7 +292,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		// add mods
 
-		for (ModCandidate mod : modCandidates) {
+		for (ModCandidateImpl mod : modCandidates) {
 			if (!mod.hasPath() && !mod.isBuiltin()) {
 				try {
 					mod.setPaths(Collections.singletonList(mod.copyToDir(outputdir, false)));
@@ -342,10 +353,10 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		return objectShare;
 	}
 
-	public ModCandidate getModCandidate(String id) {
+	public ModCandidateImpl getModCandidate(String id) {
 		if (modCandidates == null) return null;
 
-		for (ModCandidate mod : modCandidates) {
+		for (ModCandidateImpl mod : modCandidates) {
 			if (mod.getId().equals(id)) return mod;
 		}
 
@@ -376,7 +387,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		return FabricLauncherBase.getLauncher().isDevelopment();
 	}
 
-	private void addMod(ModCandidate candidate) throws ModResolutionException {
+	private void addMod(ModCandidateImpl candidate) throws ModResolutionException {
 		ModContainerImpl container = new ModContainerImpl(candidate);
 		mods.add(container);
 		modMap.put(candidate.getId(), container);
