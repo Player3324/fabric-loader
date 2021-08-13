@@ -35,13 +35,14 @@ import java.util.zip.ZipInputStream;
 
 import net.fabricmc.loader.api.Version;
 import net.fabricmc.loader.api.metadata.ModDependency;
+import net.fabricmc.loader.api.plugin.ModCandidate;
 import net.fabricmc.loader.impl.game.GameProvider.BuiltinMod;
 import net.fabricmc.loader.impl.metadata.AbstractModMetadata;
 import net.fabricmc.loader.impl.metadata.DependencyOverrides;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
 import net.fabricmc.loader.impl.metadata.VersionOverrides;
 
-public final class ModCandidateImpl implements DomainObject.Mod {
+public final class ModCandidateImpl implements ModCandidate, DomainObject.Mod {
 	static final Comparator<ModCandidateImpl> ID_VERSION_COMPARATOR = new Comparator<ModCandidateImpl>() {
 		@Override
 		public int compare(ModCandidateImpl a, ModCandidateImpl b) {
@@ -70,7 +71,7 @@ public final class ModCandidateImpl implements DomainObject.Mod {
 		return new ModCandidateImpl(mod.paths, null, -1, metadata, false, Collections.emptyList());
 	}
 
-	static ModCandidateImpl createPlain(List<Path> paths, LoaderModMetadata metadata, boolean requiresRemap, Collection<ModCandidateImpl> nestedMods) {
+	public static ModCandidateImpl createPlain(List<Path> paths, LoaderModMetadata metadata, boolean requiresRemap, Collection<ModCandidateImpl> nestedMods) {
 		return new ModCandidateImpl(paths, null, -1, metadata, requiresRemap, nestedMods);
 	}
 

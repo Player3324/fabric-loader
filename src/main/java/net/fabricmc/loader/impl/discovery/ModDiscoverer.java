@@ -246,6 +246,22 @@ public final class ModDiscoverer {
 		return ModCandidateImpl.createBuiltin(builtinMod, versionOverrides, depOverrides);
 	}
 
+	public ModCandidateImpl scan(List<Path> paths, boolean requiresRemap) {
+		ModCandidateImpl ret = new ModScanTask(paths, requiresRemap).compute();
+
+		for (NestedModInitData data : nestedModInitDatas) {
+			for (Future<ModCandidateImpl> future : data.futures) {
+				try {
+					data.target.add(future.get());
+				} catch (ExecutionException | InterruptedException e) {
+					throw ExceptionUtil.wrap(e);
+				}
+			}
+		}
+
+		return ret;
+	}
+
 	@SuppressWarnings("serial")
 	final class ModScanTask extends RecursiveTask<ModCandidateImpl> {
 		private final List<Path> paths;
