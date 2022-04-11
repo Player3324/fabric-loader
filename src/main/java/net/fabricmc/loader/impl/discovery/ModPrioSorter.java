@@ -17,7 +17,6 @@
 package net.fabricmc.loader.impl.discovery;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -25,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import net.fabricmc.loader.api.Version;
+import net.fabricmc.loader.api.metadata.ProvidedMod;
 
 final class ModPrioSorter {
 	/**
@@ -54,9 +53,10 @@ final class ModPrioSorter {
 		for (ModCandidateImpl mod : mods) {
 			modsById.computeIfAbsent(mod.getId(), ignore -> new ArrayList<>()).add(mod);
 
-			for (String provided : mod.getProvides()) {
-				modsById.computeIfAbsent(provided, ignore -> new ArrayList<>()).add(mod);
-				providedMods.add(provided);
+			for (ProvidedMod provided : mod.getAdditionallyProvidedMods()) {
+				String providedId = provided.getId();
+				modsById.computeIfAbsent(providedId, ignore -> new ArrayList<>()).add(mod);
+				providedMods.add(providedId);
 			}
 		}
 
@@ -96,10 +96,12 @@ final class ModPrioSorter {
 				potentiallyOverlappingIds.add(id);
 			}
 
-			if (!mod.getProvides().isEmpty()) {
-				for (String provId : mod.getProvides()) {
-					if (providedMods.contains(provId)) {
-						potentiallyOverlappingIds.add(provId);
+			if (!mod.getAdditionallyProvidedMods().isEmpty()) {
+				for (ProvidedMod provided : mod.getAdditionallyProvidedMods()) {
+					String providedId = provided.getId();
+
+					if (providedMods.contains(providedId)) {
+						potentiallyOverlappingIds.add(providedId);
 					}
 				}
 			}
@@ -116,9 +118,19 @@ final class ModPrioSorter {
 				if (cmpId.equals(id)) break; // can't move mod past another mod with the same id since that mod since that mod would have a higher version due to the previous sorting step and thus always has higher prio
 
 				// quick check if it might match
-				if (!potentiallyOverlappingIds.contains(cmpId)
-						&& (cmpMod.getProvides().isEmpty() || Collections.disjoint(potentiallyOverlappingIds, cmpMod.getProvides()))) {
-					continue;
+				if (!potentiallyOverlappingIds.contains(cmpId)) {
+					if (cmpMod.getAdditionallyProvidedMods().isEmpty()) continue;
+
+					boolean found = false;
+
+					for (ProvidedMod provided : cmpMod.getAdditionallyProvidedMods()) {
+						if (potentiallyOverlappingIds.contains(provided.getId())) {
+							found = true;
+							break;
+						}
+					}
+
+					if (!found) continue;
 				}
 
 				int cmp = compareOverlappingIds(mod, cmpMod, Integer.MAX_VALUE);
@@ -210,29 +222,24 @@ final class ModPrioSorter {
 		int ret = 0; // sum of individual normalized pair comparisons, may cancel each other out
 		boolean matched = false; // whether any ids overlap, for falling back to main id comparison as if there were no provides
 
-		for (String provIdA : a.getProvides()) { // a-provides vs b
-			if (provIdA.equals(b.getId())) {
-				Version providedVersionA = a.getVersion();
-				ret += Integer.signum(b.getVersion().compareTo(providedVersionA));
+		for (ProvidedMod providedA : a.getAdditionallyProvidedMods()) { // a-provides vs b
+			if (providedA.getId().equals(b.getId())) {
+				ret += Integer.signum(b.getVersion().compareTo(providedA.getVersion()));
 				matched = true;
 			}
 		}
 
-		for (String provIdB : b.getProvides()) {
-			if (provIdB.equals(a.getId())) { // a vs b-provides
-				Version providedVersionB = b.getVersion();
-				ret += Integer.signum(providedVersionB.compareTo(a.getVersion()));
+		for (ProvidedMod providedB : b.getAdditionallyProvidedMods()) {
+			if (providedB.getId().equals(a.getId())) { // a vs b-provides
+				ret += Integer.signum(providedB.getVersion().compareTo(a.getVersion()));
 				matched = true;
 
 				continue;
 			}
 
-			for (String provIdA : a.getProvides()) { // a-provides vs b-provides
-				if (provIdB.equals(provIdA)) {
-					Version providedVersionA = a.getVersion();
-					Version providedVersionB = b.getVersion();
-
-					ret += Integer.signum(providedVersionB.compareTo(providedVersionA));
+			for (ProvidedMod providedA : a.getAdditionallyProvidedMods()) { // a-provides vs b-provides
+				if (providedB.getId().equals(providedA.getId())) {
+					ret += Integer.signum(providedB.getVersion().compareTo(providedA.getVersion()));
 					matched = true;
 
 					break;

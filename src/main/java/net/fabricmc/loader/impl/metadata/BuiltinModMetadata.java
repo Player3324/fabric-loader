@@ -33,6 +33,7 @@ import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModEnvironment;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.api.metadata.Person;
+import net.fabricmc.loader.api.metadata.ProvidedMod;
 
 public final class BuiltinModMetadata extends AbstractModMetadata {
 	private final String id;
@@ -79,7 +80,7 @@ public final class BuiltinModMetadata extends AbstractModMetadata {
 	}
 
 	@Override
-	public Collection<String> getProvides() {
+	public Collection<ProvidedMod> getAdditionallyProvidedMods() {
 		return Collections.emptyList();
 	}
 
