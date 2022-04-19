@@ -192,11 +192,11 @@ final class ModPrioSorter {
 	}
 
 	private static int compareParents(ModCandidateImpl a, ModCandidateImpl b) {
-		assert !a.getParentMods().isEmpty() && !b.getParentMods().isEmpty();
+		assert !a.getContainingMods().isEmpty() && !b.getContainingMods().isEmpty();
 
 		ModCandidateImpl minParent = null;
 
-		for (ModCandidateImpl mod : a.getParentMods()) {
+		for (ModCandidateImpl mod : a.getContainingMods()) {
 			if (minParent == null || mod != minParent && compare(minParent, mod) > 0) {
 				minParent = mod;
 			}
@@ -205,7 +205,7 @@ final class ModPrioSorter {
 		assert minParent != null;
 		boolean found = false;
 
-		for (ModCandidateImpl mod : b.getParentMods()) {
+		for (ModCandidateImpl mod : b.getContainingMods()) {
 			if (mod == minParent) { // both a and b have minParent
 				found = true;
 			} else if (compare(minParent, mod) > 0) { // b has a higher prio parent than a

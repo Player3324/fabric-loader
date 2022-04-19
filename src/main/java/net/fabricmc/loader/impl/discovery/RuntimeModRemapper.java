@@ -24,7 +24,6 @@ import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -66,8 +65,8 @@ public final class RuntimeModRemapper {
 	private static final String REMAP_TYPE_MIXIN = "mixin";
 	private static final String REMAP_TYPE_STATIC = "static";
 
-	public static void remap(Collection<ModCandidateImpl> modCandidates, Path tmpDir, Path outputDir) {
-		List<ModCandidateImpl> modsToRemap = new ArrayList<>();
+	public static void remap(Collection<ModCandidateImpl> modCandidates, Collection<ModCandidateImpl> cpMods, Path tmpDir, Path outputDir) {
+		Set<ModCandidateImpl> modsToRemap = new HashSet<>();
 		Set<InputTag> remapMixins = new HashSet<>();
 
 		for (ModCandidateImpl mod : modCandidates) {
@@ -93,7 +92,7 @@ public final class RuntimeModRemapper {
 			ClassTweaker mergedClassTweaker = ClassTweaker.newInstance();
 			mergedClassTweaker.visitHeader(modNs);
 
-			for (ModCandidateImpl mod : modsToRemap) {
+			for (ModCandidateImpl mod : cpMods) {
 				RemapInfo info = new RemapInfo();
 				infoMap.put(mod, info);
 
@@ -106,9 +105,6 @@ public final class RuntimeModRemapper {
 					info.inputPath = mod.copyToDir(tmpDir, true);
 					info.inputIsTemp = true;
 				}
-
-				info.outputPath = outputDir.resolve(mod.getDefaultFileName());
-				Files.deleteIfExists(info.outputPath);
 
 				String classTweaker = mod.getMetadata().getClassTweaker();
 
@@ -142,17 +138,24 @@ public final class RuntimeModRemapper {
 
 			String defaultMixinRemapType = System.getProperty(SystemProperties.DEFAULT_MIXIN_REMAP_TYPE, REMAP_TYPE_MIXIN);
 
-			for (ModCandidateImpl mod : modsToRemap) {
+			for (ModCandidateImpl mod : cpMods) {
 				RemapInfo info = infoMap.get(mod);
 
-				InputTag tag = remapper.createInputTag();
-				info.tag = tag;
+				if (modsToRemap.contains(mod)) {
+					InputTag tag = remapper.createInputTag();
+					info.tag = tag;
 
-				if (requiresMixinRemap(info.inputPath, defaultMixinRemapType)) {
-					remapMixins.add(tag);
+					if (requiresMixinRemap(info.inputPath, defaultMixinRemapType)) {
+						remapMixins.add(tag);
+					}
+
+					info.outputPath = outputDir.resolve(mod.getDefaultFileName());
+					Files.deleteIfExists(info.outputPath);
+
+					remapper.readInputsAsync(tag, info.inputPath);
+				} else {
+					remapper.readClassPathAsync(info.inputPath);
 				}
-
-				remapper.readInputsAsync(tag, info.inputPath);
 			}
 
 			//Done in a 2nd loop as we need to make sure all the inputs are present before remapping
