@@ -32,7 +32,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import net.fabricmc.loader.api.SemanticVersion;
-import net.fabricmc.loader.api.extension.ModCandidate;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.version.VersionInterval;
 import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;

@@ -18,12 +18,13 @@ package net.fabricmc.loader.impl.discovery;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -35,8 +36,6 @@ import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.Manifest;
 import java.util.stream.Collectors;
-
-import org.objectweb.asm.commons.Remapper;
 
 import net.fabricmc.classtweaker.api.ClassTweaker;
 import net.fabricmc.classtweaker.api.ClassTweakerReader;
@@ -56,6 +55,7 @@ import net.fabricmc.loader.impl.util.log.TinyRemapperLoggerAdapter;
 import net.fabricmc.tinyremapper.InputTag;
 import net.fabricmc.tinyremapper.NonClassCopyMode;
 import net.fabricmc.tinyremapper.OutputConsumerPath;
+import net.fabricmc.tinyremapper.OutputConsumerPath.ResourceRemapper;
 import net.fabricmc.tinyremapper.TinyRemapper;
 import net.fabricmc.tinyremapper.TinyUtils;
 import net.fabricmc.tinyremapper.extension.mixin.MixinExtension;
@@ -97,12 +97,9 @@ public final class RuntimeModRemapper {
 				infoMap.put(mod, info);
 
 				if (mod.hasPath()) {
-					List<Path> paths = mod.getPaths();
-					if (paths.size() != 1) throw new UnsupportedOperationException("multiple path for "+mod);
-
-					info.inputPath = paths.get(0);
+					info.inputPaths = mod.getPaths();
 				} else {
-					info.inputPath = mod.copyToDir(tmpDir, true);
+					info.inputPaths = Collections.singletonList(mod.copyToDir(tmpDir, true));
 					info.inputIsTemp = true;
 				}
 
@@ -110,12 +107,24 @@ public final class RuntimeModRemapper {
 
 				if (classTweaker != null) {
 					info.classTweakerPath = classTweaker;
+					boolean found = false;
 
-					try (FileSystemUtil.FileSystemDelegate jarFs = FileSystemUtil.getJarFileSystem(info.inputPath, false)) {
-						FileSystem fs = jarFs.get();
-						info.classTweaker = Files.readAllBytes(fs.getPath(classTweaker));
-					} catch (Throwable t) {
-						throw new RuntimeException("Error reading class tweaker for mod '" +mod.getId()+ "'!", t);
+					for (Path inputPath : info.inputPaths) {
+						try (FileSystemUtil.FileSystemDelegate jarFs = FileSystemUtil.getJarFileSystem(inputPath, false)) {
+							Path ctPath = jarFs.get().getPath(classTweaker);
+
+							if (Files.exists(ctPath)) {
+								info.classTweaker = Files.readAllBytes(ctPath);
+								found = true;
+								break;
+							}
+						} catch (Throwable t) {
+							throw new RuntimeException("Error reading class tweaker for mod '" +mod.getId()+ "'!", t);
+						}
+					}
+
+					if (!found) {
+						throw new RuntimeException("Missing class tweaker file "+classTweaker+" for mod " +mod.getId());
 					}
 
 					ClassTweakerReader.create(mergedClassTweaker).read(info.classTweaker, modNs);
@@ -136,6 +145,8 @@ public final class RuntimeModRemapper {
 				throw new RuntimeException("Failed to populate remap classpath", e);
 			}
 
+			//gather inputs and class path
+
 			String defaultMixinRemapType = System.getProperty(SystemProperties.DEFAULT_MIXIN_REMAP_TYPE, REMAP_TYPE_MIXIN);
 
 			for (ModCandidateImpl mod : cpMods) {
@@ -145,62 +156,57 @@ public final class RuntimeModRemapper {
 					InputTag tag = remapper.createInputTag();
 					info.tag = tag;
 
-					if (requiresMixinRemap(info.inputPath, defaultMixinRemapType)) {
+					if (requiresMixinRemap(info.inputPaths, defaultMixinRemapType)) {
 						remapMixins.add(tag);
 					}
 
 					info.outputPath = outputDir.resolve(mod.getDefaultFileName());
 					Files.deleteIfExists(info.outputPath);
 
-					remapper.readInputsAsync(tag, info.inputPath);
+					remapper.readInputsAsync(tag, info.inputPaths.toArray(new Path[0]));
 				} else {
-					remapper.readClassPathAsync(info.inputPath);
+					remapper.readClassPathAsync(info.inputPaths.toArray(new Path[0]));
 				}
 			}
 
-			//Done in a 2nd loop as we need to make sure all the inputs are present before remapping
+			// copy non-classes, remap AWs, apply remapping
+
 			for (ModCandidateImpl mod : modsToRemap) {
 				RemapInfo info = infoMap.get(mod);
-				OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(info.outputPath).build();
+				List<ResourceRemapper> resourceRemappers = NonClassCopyMode.FIX_META_INF.remappers;
 
-				FileSystemUtil.FileSystemDelegate delegate = FileSystemUtil.getJarFileSystem(info.inputPath, false);
-
-				if (delegate.get() == null) {
-					throw new RuntimeException("Could not open JAR file " + info.inputPath.getFileName() + " for NIO reading!");
-				}
-
-				Path inputJar = delegate.get().getRootDirectories().iterator().next();
-				outputConsumer.addNonClassFiles(inputJar, NonClassCopyMode.FIX_META_INF, remapper);
-
-				info.outputConsumerPath = outputConsumer;
-
-				remapper.apply(outputConsumer, info.tag);
-			}
-
-			//Done in a 3rd loop as this can happen when the remapper is doing its thing.
-			for (ModCandidateImpl mod : modsToRemap) {
-				RemapInfo info = infoMap.get(mod);
-
+				// aw remapping
 				if (info.classTweaker != null) {
-					info.classTweaker = remapClassTweaker(info.classTweaker, remapper.getEnvironment().getRemapper(), modNs, runtimeNs);
+					ResourceRemapper ctRemapper = createClassTweakerRemapper(info, modNs, runtimeNs);
+
+					if (ctRemapper != null) {
+						resourceRemappers = new ArrayList<>(resourceRemappers);
+						resourceRemappers.add(ctRemapper);
+					}
+				}
+
+				try (OutputConsumerPath outputConsumer = new OutputConsumerPath.Builder(info.outputPath).build()) {
+					for (Path path : info.inputPaths) {
+						FileSystemUtil.FileSystemDelegate delegate = FileSystemUtil.getJarFileSystem(path, false); // TODO: close properly
+
+						if (delegate.get() == null) {
+							throw new RuntimeException("Could not open JAR file " + path + " for NIO reading!");
+						}
+
+						Path inputJar = delegate.get().getRootDirectories().iterator().next();
+						outputConsumer.addNonClassFiles(inputJar, remapper, resourceRemappers);
+					}
+
+					remapper.apply(outputConsumer, info.tag);
 				}
 			}
 
 			remapper.finish();
 
+			// update paths
+
 			for (ModCandidateImpl mod : modsToRemap) {
 				RemapInfo info = infoMap.get(mod);
-
-				info.outputConsumerPath.close();
-
-				if (info.classTweakerPath != null) {
-					try (FileSystemUtil.FileSystemDelegate jarFs = FileSystemUtil.getJarFileSystem(info.outputPath, false)) {
-						FileSystem fs = jarFs.get();
-
-						Files.delete(fs.getPath(info.classTweakerPath));
-						Files.write(fs.getPath(info.classTweakerPath), info.classTweaker);
-					}
-				}
 
 				mod.setPaths(Collections.singletonList(info.outputPath));
 			}
@@ -225,7 +231,11 @@ public final class RuntimeModRemapper {
 		} finally {
 			for (RemapInfo info : infoMap.values()) {
 				try {
-					if (info.inputIsTemp) Files.deleteIfExists(info.inputPath);
+					if (info.inputIsTemp) {
+						for (Path path : info.inputPaths) {
+							Files.deleteIfExists(path);
+						}
+					}
 				} catch (IOException e) {
 					Log.warn(LogCategory.MOD_REMAP, "Error deleting temporary input jar %s", info.inputIsTemp, e);
 				}
@@ -233,12 +243,23 @@ public final class RuntimeModRemapper {
 		}
 	}
 
-	private static byte[] remapClassTweaker(byte[] input, Remapper remapper, String modNs, String runtimeNs) {
-		ClassTweakerWriter writer = ClassTweakerWriter.create(ClassTweaker.CT_LATEST);
-		ClassTweakerRemapperVisitor remappingDecorator = new ClassTweakerRemapperVisitor(writer, remapper, modNs, runtimeNs);
-		ClassTweakerReader reader = ClassTweakerReader.create(remappingDecorator);
-		reader.read(input, modNs);
-		return writer.getOutput();
+	private static ResourceRemapper createClassTweakerRemapper(RemapInfo remapInfo, String modNs, String runtimeNs) {
+		return new ResourceRemapper() {
+			@Override
+			public boolean canTransform(TinyRemapper remapper, Path relativePath) {
+				return relativePath.toString().equals(remapInfo.classTweakerPath);
+			}
+
+			@Override
+			public void transform(Path destinationDirectory, Path relativePath, InputStream input, TinyRemapper remapper) throws IOException {
+				ClassTweakerWriter writer = ClassTweakerWriter.create(ClassTweaker.CT_LATEST);
+				ClassTweakerRemapperVisitor remappingDecorator = new ClassTweakerRemapperVisitor(writer, remapper.getEnvironment().getRemapper(), modNs, runtimeNs);
+				ClassTweakerReader reader = ClassTweakerReader.create(remappingDecorator);
+				reader.read(input.readAllBytes(), modNs);
+
+				Files.write(destinationDirectory.resolve(relativePath.toString()), writer.getOutput());
+			}
+		};
 	}
 
 	private static List<Path> getRemapClasspath() throws IOException {
@@ -260,24 +281,29 @@ public final class RuntimeModRemapper {
 	 *
 	 * <p>This is typically the case when a mod was built without the Mixin annotation processor generating refmaps.
 	 */
-	private static boolean requiresMixinRemap(Path inputPath, String defaultMixinRemapType) throws IOException, URISyntaxException {
-		final Manifest manifest = ManifestUtil.readManifest(inputPath);
-		if (manifest == null) return false;
+	private static boolean requiresMixinRemap(Collection<Path> inputPaths, String defaultMixinRemapType) throws IOException, URISyntaxException {
+		for (Path inputPath : inputPaths) {
+			Manifest manifest = ManifestUtil.readManifest(inputPath);
+			if (manifest == null) continue;
 
-		final Attributes mainAttributes = manifest.getMainAttributes();
+			Attributes mainAttributes = manifest.getMainAttributes();
 
-		String remapType = mainAttributes.getValue(REMAP_TYPE_MANIFEST_KEY);
-		if (remapType == null) remapType = defaultMixinRemapType;
+			String remapType = mainAttributes.getValue(REMAP_TYPE_MANIFEST_KEY);
+			if (remapType == null) remapType = defaultMixinRemapType;
 
-		return REMAP_TYPE_STATIC.equalsIgnoreCase(remapType);
+			if (REMAP_TYPE_STATIC.equalsIgnoreCase(remapType)) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private static class RemapInfo {
 		InputTag tag;
-		Path inputPath;
+		List<Path> inputPaths;
 		Path outputPath;
 		boolean inputIsTemp;
-		OutputConsumerPath outputConsumerPath;
 		String classTweakerPath;
 		byte[] classTweaker;
 	}
