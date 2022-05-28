@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Set;
@@ -42,7 +43,9 @@ public final class ModMetadataParser {
 	public static LoaderModMetadata parseMetadata(InputStream is, String modPath, List<String> modParentPaths,
 			VersionOverrides versionOverrides, DependencyOverrides depOverrides) throws ParseMetadataException {
 		try {
-			LoaderModMetadata ret = readModMetadata(is);
+			ModMetadataBuilderImpl builder = new ModMetadataBuilderImpl();
+			readModMetadata(is, builder);
+			LoaderModMetadata ret = builder.build();
 
 			versionOverrides.apply(ret);
 			depOverrides.apply(ret);
@@ -60,7 +63,7 @@ public final class ModMetadataParser {
 		}
 	}
 
-	private static LoaderModMetadata readModMetadata(InputStream is) throws IOException, ParseMetadataException {
+	private static void readModMetadata(InputStream is, ModMetadataBuilderImpl builder) throws IOException, ParseMetadataException {
 		// So some context:
 		// Per the json specification, ordering of fields is not typically enforced.
 		// Furthermore we cannot guarantee the `schemaVersion` is the first field in every `fabric.mod.json`
@@ -102,10 +105,10 @@ public final class ModMetadataParser {
 					if (firstField) {
 						reader.setRewindEnabled(false);
 						// Finish reading the metadata
-						LoaderModMetadata ret = readModMetadata(reader, schemaVersion);
+						readModMetadata(reader, schemaVersion, builder);
 						reader.endObject();
 
-						return ret;
+						return;
 					}
 
 					// schemaVersion found, but after some content -> start over to parse all data with the detected version
@@ -125,25 +128,28 @@ public final class ModMetadataParser {
 			reader.setRewindEnabled(false);
 
 			reader.beginObject();
-			LoaderModMetadata ret = readModMetadata(reader, schemaVersion);
+			readModMetadata(reader, schemaVersion, builder);
 			reader.endObject();
 
 			if (FabricLoader.getInstance().isDevelopmentEnvironment()) {
-				Log.warn(LogCategory.METADATA, "\"fabric.mod.json\" from mod %s did not have \"schemaVersion\" as first field.", ret.getId());
+				Log.warn(LogCategory.METADATA, "\"fabric.mod.json\" from mod %s did not have \"schemaVersion\" as first field.", builder.getId());
 			}
-
-			return ret;
 		}
 	}
 
-	private static LoaderModMetadata readModMetadata(JsonReader reader, int schemaVersion) throws IOException, ParseMetadataException {
+	private static void readModMetadata(JsonReader reader, int schemaVersion, ModMetadataBuilderImpl builder) throws IOException, ParseMetadataException {
 		// don't forget to update LATEST_VERSION!
+
+		builder.setSchemaVersion(schemaVersion);
+		List<ParseWarning> warnings = new ArrayList<>();
 
 		switch (schemaVersion) {
 		case 0:
-			return V0ModMetadataParser.parse(reader);
+			V0ModMetadataParser.parse(reader, warnings, builder);
+			break;
 		case 1:
-			return V1ModMetadataParser.parse(reader);
+			V1ModMetadataParser.parse(reader, warnings, builder);
+			break;
 		default:
 			if (schemaVersion > 0) {
 				throw new ParseMetadataException(String.format("This version of fabric-loader doesn't support the newer schema version of \"%s\""
@@ -152,6 +158,17 @@ public final class ModMetadataParser {
 
 			throw new ParseMetadataException(String.format("Invalid/Unsupported schema version \"%s\" was found", schemaVersion));
 		}
+
+		// Validate all required fields are resolved
+		if (builder.getId() == null) {
+			throw new ParseMetadataException.MissingField("id");
+		}
+
+		if (builder.getVersion() == null) {
+			throw new ParseMetadataException.MissingField("version");
+		}
+
+		ModMetadataParser.logWarningMessages(builder.getId(), warnings);
 	}
 
 	static void logWarningMessages(String id, List<ParseWarning> warnings) {
