@@ -120,8 +120,8 @@ final class ModMetadataWriter {
 			jw.endArray();
 		}
 
-		if (meta.accessWidener != null) {
-			jw.name("accessWidener").value(meta.accessWidener);
+		if (meta.classTweaker != null) {
+			jw.name("classTweaker").value(meta.classTweaker);
 		}
 
 		if (!meta.dependencies.isEmpty()) {

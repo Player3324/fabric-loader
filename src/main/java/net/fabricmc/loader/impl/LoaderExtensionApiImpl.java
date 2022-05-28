@@ -37,6 +37,7 @@ import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
+import net.fabricmc.loader.impl.metadata.ModMetadataBuilderImpl;
 
 public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	static final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>(); // TODO: use this
@@ -84,7 +85,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		ModDiscoverer discoverer = FabricLoaderImpl.INSTANCE.getDiscoverer();
 		if (discoverer == null) throw new IllegalStateException("createMod is only available during mod discovery");
 
-		boolean remap = namespace != null && !namespace.equals(FabricLauncherBase.getLauncher().getTargetNamespace());
+		boolean remap = namespace != null && !namespace.equals(FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace());
 
 		return discoverer.scan(normalizePaths(paths), remap);
 	}
@@ -100,6 +101,8 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 
 		if (metadata instanceof LoaderModMetadata) {
 			loaderMeta = (LoaderModMetadata) metadata;
+		} else if (metadata instanceof ModMetadataBuilderImpl) {
+			loaderMeta = ((ModMetadataBuilderImpl) metadata).build();
 		} else { // TODO: wrap other types
 			throw new IllegalArgumentException("invalid ModMetadata class: "+metadata.getClass());
 		}
