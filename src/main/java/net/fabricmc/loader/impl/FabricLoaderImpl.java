@@ -588,19 +588,22 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 	public void loadClassTweakers() {
 		ClassTweakerReader ctReader = ClassTweakerReader.create(classTweaker);
+		String runtimeNs = FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace();
 
 		for (ModContainer modContainer : mods) {
 			LoaderModMetadata modMetadata = (LoaderModMetadata) modContainer.getMetadata();
-			String location = modMetadata.getClassTweaker();
-			if (location == null) continue;
+			Collection<String> classTweakers = modMetadata.getClassTweakers();
+			if (classTweakers.isEmpty()) continue;
 
-			Path path = modContainer.findPath(location).orElse(null);
-			if (path == null) throw new RuntimeException(String.format("Missing classTweaker file %s from mod %s", location, modContainer.getMetadata().getId()));
+			for (String loc : classTweakers) {
+				Path path = modContainer.findPath(loc).orElse(null);
+				if (path == null) throw new RuntimeException(String.format("Missing classTweaker (accessWidener) file %s from mod %s", loc, modContainer.getMetadata().getId()));
 
-			try (BufferedReader reader = Files.newBufferedReader(path)) {
-				ctReader.read(reader, FabricLauncherBase.getLauncher().getMappingConfiguration().getRuntimeNamespace());
-			} catch (Exception e) {
-				throw new RuntimeException("Failed to read classTweaker file from mod " + modMetadata.getId(), e);
+				try (BufferedReader reader = Files.newBufferedReader(path)) {
+					ctReader.read(reader, runtimeNs);
+				} catch (Exception e) {
+					throw new RuntimeException("Failed to read classTweaker (accessWidener) file from mod " + modMetadata.getId(), e);
+				}
 			}
 		}
 	}

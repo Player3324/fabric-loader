@@ -21,6 +21,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -91,6 +92,7 @@ public final class RuntimeModRemapper {
 
 			ClassTweaker mergedClassTweaker = ClassTweaker.newInstance();
 			mergedClassTweaker.visitHeader(modNs);
+			ClassTweakerReader ctReader = ClassTweakerReader.create(mergedClassTweaker);
 
 			for (ModCandidateImpl mod : cpMods) {
 				RemapInfo info = new RemapInfo();
@@ -103,31 +105,56 @@ public final class RuntimeModRemapper {
 					info.inputIsTemp = true;
 				}
 
-				String classTweaker = mod.getMetadata().getClassTweaker();
+				Collection<String> classTweakers = mod.getMetadata().getClassTweakers();
 
-				if (classTweaker != null) {
-					info.classTweakerPath = classTweaker;
-					boolean found = false;
+				if (classTweakers != null && !classTweakers.isEmpty()) {
+					info.classTweakers = new ArrayList<>(classTweakers.size());
+
+					for (String path : classTweakers) {
+						info.classTweakers.add(new ClassTweakerInfo(path));
+					}
+
+					int remaining = classTweakers.size();
 
 					for (Path inputPath : info.inputPaths) {
 						try (FileSystemUtil.FileSystemDelegate jarFs = FileSystemUtil.getJarFileSystem(inputPath, false)) {
-							Path ctPath = jarFs.get().getPath(classTweaker);
+							FileSystem fs = jarFs.get();
 
-							if (Files.exists(ctPath)) {
-								info.classTweaker = Files.readAllBytes(ctPath);
-								found = true;
-								break;
+							for (ClassTweakerInfo ct : info.classTweakers) {
+								if (ct.data != null) continue;
+
+								Path ctPath = fs.getPath(ct.path);
+
+								if (Files.exists(ctPath)) {
+									ct.data = Files.readAllBytes(ctPath);
+									remaining--;
+									if (remaining == 0) break;
+								}
 							}
+
+							if (remaining == 0) break;
 						} catch (Throwable t) {
-							throw new RuntimeException("Error reading class tweaker for mod '" +mod.getId()+ "'!", t);
+							throw new RuntimeException("Error reading class tweakers for mod " +mod.getId()+ " from "+inputPath, t);
 						}
 					}
 
-					if (!found) {
-						throw new RuntimeException("Missing class tweaker file "+classTweaker+" for mod " +mod.getId());
+					if (remaining > 0) {
+						List<String> missing = new ArrayList<>();
+
+						for (ClassTweakerInfo ct : info.classTweakers) {
+							if (ct.data == null) missing.add(ct.path);
+						}
+
+						throw new RuntimeException("Missing class tweaker files "+missing+" for mod " +mod.getId());
 					}
 
-					ClassTweakerReader.create(mergedClassTweaker).read(info.classTweaker, modNs);
+					for (ClassTweakerInfo ct : info.classTweakers) {
+						try {
+							ctReader.read(ct.data, modNs);
+						} catch (Throwable t) {
+							throw new RuntimeException("Error reading class tweaker for mod " +mod.getId()+ " from "+ct.path, t);
+						}
+					}
 				}
 			}
 
@@ -169,14 +196,14 @@ public final class RuntimeModRemapper {
 				}
 			}
 
-			// copy non-classes, remap AWs, apply remapping
+			// copy non-classes, remap CTs, apply remapping
 
 			for (ModCandidateImpl mod : modsToRemap) {
 				RemapInfo info = infoMap.get(mod);
 				List<ResourceRemapper> resourceRemappers = NonClassCopyMode.FIX_META_INF.remappers;
 
-				// aw remapping
-				if (info.classTweaker != null) {
+				// ct remapping
+				if (info.classTweakers != null) {
 					ResourceRemapper ctRemapper = createClassTweakerRemapper(info, modNs, runtimeNs);
 
 					if (ctRemapper != null) {
@@ -247,19 +274,30 @@ public final class RuntimeModRemapper {
 		return new ResourceRemapper() {
 			@Override
 			public boolean canTransform(TinyRemapper remapper, Path relativePath) {
-				return relativePath.toString().equals(remapInfo.classTweakerPath);
+				return findClassTweaker(remapInfo, relativePath.toString()) != null;
 			}
 
 			@Override
 			public void transform(Path destinationDirectory, Path relativePath, InputStream input, TinyRemapper remapper) throws IOException {
+				ClassTweakerInfo ct = findClassTweaker(remapInfo, relativePath.toString());
+				assert ct != null; // shouldn't happen due to canTransform
+
 				ClassTweakerWriter writer = ClassTweakerWriter.create(ClassTweaker.CT_LATEST);
 				ClassTweakerRemapperVisitor remappingDecorator = new ClassTweakerRemapperVisitor(writer, remapper.getEnvironment().getRemapper(), modNs, runtimeNs);
 				ClassTweakerReader reader = ClassTweakerReader.create(remappingDecorator);
-				reader.read(input.readAllBytes(), modNs);
+				reader.read(ct.data, modNs);
 
 				Files.write(destinationDirectory.resolve(relativePath.toString()), writer.getOutput());
 			}
 		};
+	}
+
+	private static ClassTweakerInfo findClassTweaker(RemapInfo remapInfo, String path) {
+		for (ClassTweakerInfo ct : remapInfo.classTweakers) {
+			if (ct.path.equals(path)) return ct;
+		}
+
+		return null;
 	}
 
 	private static List<Path> getRemapClasspath() throws IOException {
@@ -299,12 +337,20 @@ public final class RuntimeModRemapper {
 		return false;
 	}
 
-	private static class RemapInfo {
+	private static final class RemapInfo {
 		InputTag tag;
 		List<Path> inputPaths;
 		Path outputPath;
 		boolean inputIsTemp;
-		String classTweakerPath;
-		byte[] classTweaker;
+		Collection<ClassTweakerInfo> classTweakers;
+	}
+
+	private static final class ClassTweakerInfo {
+		final String path;
+		byte[] data;
+
+		ClassTweakerInfo(String path) {
+			this.path = path;
+		}
 	}
 }
