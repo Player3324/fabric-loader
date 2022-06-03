@@ -17,6 +17,7 @@
 package net.fabricmc.loader.impl.metadata;
 
 import java.io.IOException;
+import java.io.Reader;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.io.Writer;
@@ -398,6 +399,15 @@ public final class ModMetadataBuilderImpl implements ModMetadataBuilder {
 		customValues.put(key, value);
 
 		return this;
+	}
+
+	@Override
+	public void fromJson(Reader reader) throws IOException {
+		try {
+			ModMetadataParser.readModMetadata(reader, new ArrayList<>(), this);
+		} catch (ParseMetadataException e) {
+			throw new IOException(e);
+		}
 	}
 
 	@Override
