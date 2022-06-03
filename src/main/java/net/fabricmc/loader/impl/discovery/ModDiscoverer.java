@@ -498,7 +498,10 @@ public final class ModDiscoverer {
 		}
 
 		private LoaderModMetadata parseMetadata(InputStream is, String localPath) throws ParseMetadataException {
-			return ModMetadataParser.parseMetadata(is, localPath, parentPaths, versionOverrides, depOverrides);
+			LoaderModMetadata ret = ModMetadataParser.parseMetadata(is, localPath, parentPaths, versionOverrides, depOverrides);
+			ret.applyEnvironment(envType);
+
+			return ret;
 		}
 	}
 
