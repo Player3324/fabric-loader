@@ -40,6 +40,7 @@ import net.fabricmc.loader.api.metadata.CustomValue;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModDependency.Kind;
 import net.fabricmc.loader.api.metadata.ModEnvironment;
+import net.fabricmc.loader.api.metadata.ModLoadCondition;
 import net.fabricmc.loader.api.metadata.Person;
 import net.fabricmc.loader.api.metadata.ProvidedMod;
 import net.fabricmc.loader.api.metadata.version.VersionPredicate;
@@ -64,6 +65,7 @@ public final class ModMetadataBuilderImpl implements ModMetadataBuilder {
 
 	// Optional (mod loading)
 	ModEnvironment environment = ModEnvironment.UNIVERSAL; // Default is always universal
+	ModLoadCondition loadCondition;
 	String loadPhase = LoadPhases.DEFAULT;
 	final Map<String, List<EntrypointMetadata>> entrypoints = new HashMap<>();
 	final List<String> oldInitializers = new ArrayList<>();
@@ -167,7 +169,21 @@ public final class ModMetadataBuilderImpl implements ModMetadataBuilder {
 	}
 
 	@Override
-	public ModMetadataBuilder setLoadPhase(String loadPhase) {
+	public ModLoadCondition getLoadCondition() {
+		return loadCondition;
+	}
+
+	@Override
+	public ModMetadataBuilder setLoadCondition(/* @Nullable */ ModLoadCondition loadCondition) {
+		this.loadCondition = loadCondition;
+
+		return this;
+	}
+
+	@Override
+	public ModMetadataBuilder setLoadPhase(/* @Nullable */ String loadPhase) {
+		if (loadPhase == null) loadPhase = LoadPhases.DEFAULT;
+
 		this.loadPhase = loadPhase;
 
 		return this;
@@ -447,7 +463,7 @@ public final class ModMetadataBuilderImpl implements ModMetadataBuilder {
 		return new ModMetadataImpl(schemaVersion,
 				id, version,
 				providedMods,
-				environment, loadPhase,
+				environment, loadCondition, loadPhase,
 				entrypoints, nestedMods,
 				mixins, accessWidener,
 				dependencies,
