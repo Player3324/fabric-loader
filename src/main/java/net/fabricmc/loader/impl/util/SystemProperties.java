@@ -19,6 +19,8 @@ package net.fabricmc.loader.impl.util;
 public final class SystemProperties {
 	// whether fabric loader is running in a development environment / mode, affects class path mod discovery, remapping, logging, ...
 	public static final String DEVELOPMENT = "fabric.development";
+	// whether to use a class loader that is an instance of URLClassLoader
+	public static final String USE_COMPAT_CL = "fabric.loader.useCompatibilityClassLoader";
 	public static final String SIDE = "fabric.side";
 	// skips the embedded MC game provider, letting ServiceLoader-provided ones take over
 	public static final String SKIP_MC_PROVIDER = "fabric.skipMcProvider";
@@ -63,6 +65,9 @@ public final class SystemProperties {
 	// replace mod versions (modA:versionA,modB:versionB,...)
 	public static final String DEBUG_REPLACE_VERSION = "fabric.debug.replaceVersion";
 
-	private SystemProperties() {
+	public static boolean isSet(String property) {
+		String val = System.getProperty(property);
+
+		return val != null && !val.equalsIgnoreCase("false");
 	}
 }
