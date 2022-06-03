@@ -186,7 +186,7 @@ final class ResultAnalyzer {
 						ModCandidateImpl mod = fix.activeMods.get(dep.getModId());
 
 						if (mod != null) {
-							if (dep.matches(mod.getVersion()) != dep.getKind().isPositive()) {
+							if (ModResolver.depMatches(dep, mod) != dep.getKind().isPositive()) {
 								pw.printf("\n\t\t - %s", Localization.format("resolution.solution.replaceModVersionDifferent.reqSupportedModVersion",
 										mod.getId(),
 										getVersion(mod)));
@@ -227,7 +227,7 @@ final class ResultAnalyzer {
 					case RECOMMENDS:
 						depMod = context.selectedMods.get(dep.getModId());
 
-						if (depMod == null || !dep.matches(depMod.getVersion())) {
+						if (depMod == null || !ModResolver.depMatches(dep, depMod)) {
 							addErrorToList(mod, dep, toList(depMod), context.envDisabledMods.containsKey(dep.getModId()), true, "", pw);
 						}
 
@@ -235,7 +235,7 @@ final class ResultAnalyzer {
 					case CONFLICTS:
 						depMod = context.selectedMods.get(dep.getModId());
 
-						if (depMod != null && dep.matches(depMod.getVersion())) {
+						if (depMod != null && ModResolver.depMatches(dep, depMod)) {
 							addErrorToList(mod, dep, toList(depMod), false, true, "", pw);
 						}
 
@@ -277,7 +277,7 @@ final class ResultAnalyzer {
 				present = false;
 
 				for (ModCandidateImpl match : matches) {
-					if (dep.matches(match.getVersion())) { // there is a satisfying mod version, but it can't be loaded for other reasons
+					if (ModResolver.depMatches(dep, match)) { // there is a satisfying mod version, but it can't be loaded for other reasons
 						present = true;
 						break;
 					}
