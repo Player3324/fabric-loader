@@ -693,7 +693,6 @@ public final class McVersionLookup {
 	}
 
 	private static final class FieldNameVisitor extends ClassVisitor implements Analyzer {
-
 		FieldNameVisitor(String fieldName) {
 			super(FabricLoaderImpl.ASM_VERSION);
 
@@ -718,8 +717,8 @@ public final class McVersionLookup {
 		private final String fieldName;
 		private String result;
 	}
-	private static final class MethodConstantRetVisitor extends ClassVisitor implements Analyzer {
 
+	private static final class MethodConstantRetVisitor extends ClassVisitor implements Analyzer {
 		MethodConstantRetVisitor(String methodName) {
 			super(FabricLoaderImpl.ASM_VERSION);
 
