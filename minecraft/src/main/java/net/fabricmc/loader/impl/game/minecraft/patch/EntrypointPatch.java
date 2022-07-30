@@ -98,7 +98,7 @@ public class EntrypointPatch extends GamePatch {
 				throw new RuntimeException("Could not find main method in " + entrypoint + "!");
 			}
 
-			if (type == EnvType.CLIENT && mainMethod.instructions.size() < 10) {
+			if (type == EnvType.CLIENT && mainMethod.instructions.size() < 18) {
 				// 22w24+ forwards to another method in the same class instead of processing in main() directly, use that other method instead if that's the case
 				MethodInsnNode invocation = null;
 
@@ -108,13 +108,8 @@ public class EntrypointPatch extends GamePatch {
 					if (invocation == null
 							&& insn.getType() == AbstractInsnNode.METHOD_INSN
 							&& (methodInsn = (MethodInsnNode) insn).owner.equals(mainClass.name)) {
-						// capture first method insn to the same class
+						// capture last method insn to the same class
 						invocation = methodInsn;
-					} else if (insn.getOpcode() > Opcodes.ALOAD // ignore constant and variable loads as well as NOP, labels and line numbers
-							&& insn.getOpcode() != Opcodes.RETURN) { // and RETURN
-						// found unexpected insn for a simple forwarding method
-						invocation = null;
-						break;
 					}
 				}
 

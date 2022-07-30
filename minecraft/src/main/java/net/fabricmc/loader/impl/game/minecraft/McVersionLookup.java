@@ -136,16 +136,24 @@ public final class McVersionLookup {
 				return;
 			}
 
-			CpEntry entry = cp.getEntry("net/minecraft/client/Minecraft.class");
+			CpEntry minecraft = cp.getEntry("net/minecraft/client/Minecraft.class");
+			CpEntry sharedConstants = cp.getEntry("net/minecraft/SharedConstants.class");
 
-			if (entry != null) {
+			if (minecraft != null) {
 				// version-like constant return value of a Minecraft method (obfuscated/unknown name)
-				if (fromAnalyzer(entry.getInputStream(), new MethodConstantRetVisitor(null), builder)) {
+				if (fromAnalyzer(minecraft.getInputStream(), new MethodConstantRetVisitor(null), builder)) {
 					return;
 				}
 
 				// version-like constant passed into Display.setTitle in a Minecraft method (obfuscated/unknown name)
-				if (fromAnalyzer(entry.getInputStream(), new MethodStringConstantContainsVisitor("org/lwjgl/opengl/Display", "setTitle"), builder)) {
+				if (fromAnalyzer(minecraft.getInputStream(), new MethodStringConstantContainsVisitor("org/lwjgl/opengl/Display", "setTitle"), builder)) {
+					return;
+				}
+			}
+
+			if (sharedConstants != null) {
+				// version constant set in SharedConstant's VERSION_STRING field (obfuscated/unknown name)
+				if (fromAnalyzer(sharedConstants.getInputStream(), new FieldNameVisitor("VERSION_STRING"), builder)) {
 					return;
 				}
 			}
@@ -684,7 +692,34 @@ public final class McVersionLookup {
 		private String result;
 	}
 
+	private static final class FieldNameVisitor extends ClassVisitor implements Analyzer {
+
+		FieldNameVisitor(String fieldName) {
+			super(FabricLoaderImpl.ASM_VERSION);
+
+			this.fieldName = fieldName;
+		}
+
+		@Override
+		public FieldVisitor visitField(int access, String name, String descriptor, String signature, Object value) {
+			if (name.equals(fieldName)) {
+				this.result = (String) value;
+			}
+
+			return super.visitField(access, name, descriptor, signature, value);
+		}
+
+		@Override
+		public String getResult() {
+			return this.result;
+		}
+
+
+		private final String fieldName;
+		private String result;
+	}
 	private static final class MethodConstantRetVisitor extends ClassVisitor implements Analyzer {
+
 		MethodConstantRetVisitor(String methodName) {
 			super(FabricLoaderImpl.ASM_VERSION);
 
