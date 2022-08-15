@@ -118,7 +118,7 @@ public interface ModDependency {
 		}
 	}
 
-	public interface Metadata {
+	interface Metadata {
 		String getId();
 		String getName();
 		String getDescription();

@@ -63,7 +63,7 @@ public class GetNonFabricModsTest {
 
 		loaderConstruction = Mockito.mockConstructionWithAnswer(FabricLoaderImpl.class, invocation -> loader);
 
-		discoverer = new ModDiscoverer(mock(), mock());
+		discoverer = new ModDiscoverer(mock(), mock(), mock(), mock());
 		discoverer.addCandidateFinder(new MockCandidateFinder());
 	}
 
