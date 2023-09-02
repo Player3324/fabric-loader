@@ -71,14 +71,14 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	}
 
 	@Override
-	public ModCandidate readMod(Path path, /*@Nullable*/ String namespace) {
+	public /*@Nullable*/ ModCandidate readMod(Path path, /*@Nullable*/ String namespace) {
 		Objects.requireNonNull(path, "null path");
 
 		return readMod(Collections.singletonList(path), namespace);
 	}
 
 	@Override
-	public ModCandidate readMod(List<Path> paths, /*@Nullable*/ String namespace) {
+	public /*@Nullable*/ ModCandidate readMod(List<Path> paths, /*@Nullable*/ String namespace) {
 		checkFrozen();
 		if (paths.isEmpty()) throw new IllegalArgumentException("empty paths");
 

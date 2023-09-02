@@ -257,6 +257,12 @@ public final class ModDiscoverer {
 	public ModCandidateImpl scan(List<Path> paths, boolean requiresRemap) {
 		ModCandidateImpl ret = new ModScanTask(paths, requiresRemap).compute();
 
+		if (ret == null) { // no mod found
+			assert nestedModInitDatas.isEmpty();
+
+			return null;
+		}
+
 		for (NestedModInitData data : nestedModInitDatas) {
 			for (Future<ModCandidateImpl> future : data.futures) {
 				try {
