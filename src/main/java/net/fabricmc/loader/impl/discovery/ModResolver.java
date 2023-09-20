@@ -483,18 +483,27 @@ public class ModResolver {
 		}
 
 		private boolean removeMod0(ModCandidateImpl mod) {
-			List<ModCandidateImpl> mods = modsById.get(mod.getId());
-			boolean removed = mods != null && mods.remove(mod)
-					|| addedMods.remove(mod);
+			String id = mod.getId();
+			List<ModCandidateImpl> mods = modsById.get(id);
+			boolean removed = mods != null && mods.remove(mod) // remove from candidates
+					|| addedMods.remove(mod); // remove from pending additions if not already in candidates
 
 			if (removed) {
+				// remove parent refs
 				for (ModCandidateImpl m : mod.getContainingMods()) {
 					m.getContainedMods().remove(mod);
 				}
 
+				// remove child refs
 				for (ModCandidateImpl m : mod.getContainedMods()) {
 					m.getContainingMods().remove(mod);
 				}
+
+				// remove from sorted candidate list
+				allModsSorted.remove(mod);
+
+				// discard empty by-id refs
+				if (mods.isEmpty()) modsById.remove(id);
 			}
 
 			return removed;
