@@ -117,7 +117,9 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 			nestedModsCopy = new ArrayList<>(nestedMods.size());
 
 			for (ModCandidate mod : nestedMods) {
+				if (mod == null) throw new NullPointerException("null nestedMods entry");
 				if (!(mod instanceof ModCandidateImpl)) throw new IllegalArgumentException("invalid ModCandidate class: "+mod.getClass());
+
 				nestedModsCopy.add((ModCandidateImpl) mod);
 			}
 		}
