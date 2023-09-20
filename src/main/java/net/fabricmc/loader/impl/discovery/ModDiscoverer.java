@@ -266,7 +266,8 @@ public final class ModDiscoverer {
 		for (NestedModInitData data : nestedModInitDatas) {
 			for (Future<ModCandidateImpl> future : data.futures) {
 				try {
-					data.target.add(future.get());
+					ModCandidateImpl candidate = future.get();
+					if (candidate != null) data.target.add(candidate);
 				} catch (ExecutionException | InterruptedException e) {
 					throw ExceptionUtil.wrap(e);
 				}
