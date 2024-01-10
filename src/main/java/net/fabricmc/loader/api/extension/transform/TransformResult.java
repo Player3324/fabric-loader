@@ -14,14 +14,23 @@
  * limitations under the License.
  */
 
-package net.fabricmc.loader.impl.discovery;
+package net.fabricmc.loader.api.extension.transform;
 
-import net.fabricmc.loader.impl.util.PhaseSorting;
+import net.fabricmc.loader.impl.transformer.TransformResultImpl;
 
-public final class LoadPhases {
-	public static final String DEFAULT = "default";
-
-	public static void setDefaultOrder(PhaseSorting<String, ?> sorting) {
-		sorting.addPhaseOrdering("updater", "adapter", DEFAULT);
+public interface TransformResult<T> {
+	static <T> TransformResult<T> changed(T result) {
+		return create(result, true);
 	}
+
+	static <T> TransformResult<T> same(T input) {
+		return create(input, false);
+	}
+
+	static <T> TransformResult<T> create(T result, boolean changed) {
+		return new TransformResultImpl<>(result, changed);
+	}
+
+	T getOutput();
+	boolean isChanged();
 }

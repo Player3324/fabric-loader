@@ -23,10 +23,13 @@ import java.util.Collection;
 import java.util.List;
 import java.util.jar.Manifest;
 
+import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
+
 import net.fabricmc.api.EnvType;
 
 public interface FabricLauncher {
 	MappingConfiguration getMappingConfiguration();
+	IMixinTransformer getMixinTransformer();
 
 	void addToClassPath(Path path, String... allowedPrefixes);
 	void setAllowedPrefixes(Path path, String... prefixes);
@@ -49,15 +52,14 @@ public interface FabricLauncher {
 	 * Gets the byte array for a particular class.
 	 *
 	 * @param name The name of the class to retrieve
-	 * @param runTransformers Whether to run all transformers <i>except mixin</i> on the class
+	 * @param runTransformers Whether to run all transformers <i>ordered before mixin</i> on the class
+	 * @param allowEarlyAccess Whether to allow accessing the class bytes before the class loader has been unlocked
 	 */
-	byte[] getClassByteArray(String name, boolean runTransformers) throws IOException;
+	byte[] getClassByteArray(String name, boolean runTransformers, boolean allowEarlyAccess) throws IOException;
 
 	Manifest getManifest(Path originPath);
 
 	boolean isDevelopment();
-
-	String getEntrypoint();
 
 	List<Path> getClassPath();
 }

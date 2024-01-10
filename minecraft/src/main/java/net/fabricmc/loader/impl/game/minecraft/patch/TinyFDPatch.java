@@ -19,8 +19,6 @@ package net.fabricmc.loader.impl.game.minecraft.patch;
 import static net.fabricmc.loader.impl.launch.MappingConfiguration.INTERMEDIARY_NAMESPACE;
 
 import java.util.ListIterator;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -33,25 +31,32 @@ import org.objectweb.asm.tree.MethodNode;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.impl.game.patch.GamePatch;
+import net.fabricmc.loader.api.extension.transform.ClassTransformContext;
+import net.fabricmc.loader.api.extension.transform.ClassTransformPhases;
+import net.fabricmc.loader.api.extension.transform.ClassTransformer;
+import net.fabricmc.loader.api.extension.transform.ClassTransformerBuilder;
+import net.fabricmc.loader.api.extension.transform.TransformResult;
 import net.fabricmc.loader.impl.launch.FabricLauncher;
+import net.fabricmc.loader.impl.launch.FabricLauncherBase;
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 
 /**
  * Patch the TinyFileDialogs.tinyfd_openFileDialog call to use a trusted string in MoreOptionsDialog.
  *
  * <p>This patch applies to Minecraft versions 20w21a -> 23w04a inclusive
  */
-public final class TinyFDPatch extends GamePatch {
-	private static final String MORE_OPTIONS_DIALOG_CLASS_NAME = "net.minecraft.class_5292";
+public final class TinyFDPatch {
+	private static final String MORE_OPTIONS_DIALOG_CLASS_NAME = "net/minecraft/class_5292";
 	private static final String TINYFD_METHOD_NAME = "tinyfd_openFileDialog";
 	// This is the en_us value of selectWorld.import_worldgen_settings.select_file
 	private static final String DIALOG_TITLE = "Select settings file (.json)";
 
-	@Override
-	public void process(FabricLauncher launcher, Function<String, ClassNode> classSource, Consumer<ClassNode> classEmitter) {
+	public static ClassTransformer<?> create() {
+		FabricLauncher launcher = FabricLauncherBase.getLauncher();
+
 		if (launcher.getEnvironmentType() != EnvType.CLIENT) {
 			// Fix should only be applied to clients.
-			return;
+			return null;
 		}
 
 		String className = MORE_OPTIONS_DIALOG_CLASS_NAME;
@@ -59,21 +64,17 @@ public final class TinyFDPatch extends GamePatch {
 		// Only remap the classname when needed to prevent loading the mappings when not required in prod.
 		if (!launcher.getMappingConfiguration().getRuntimeNamespace().equals(INTERMEDIARY_NAMESPACE)
 				&& FabricLoader.getInstance().getMappingResolver().getNamespaces().contains(INTERMEDIARY_NAMESPACE)) {
-			className = FabricLoader.getInstance().getMappingResolver().mapClassName(INTERMEDIARY_NAMESPACE, MORE_OPTIONS_DIALOG_CLASS_NAME);
+			className = FabricLoader.getInstance().getMappingResolver().mapClassName(INTERMEDIARY_NAMESPACE, MORE_OPTIONS_DIALOG_CLASS_NAME.replace('/', '.')).replace('.', '/');
 		}
 
-		final ClassNode classNode = classSource.apply(className);
-
-		if (classNode == null) {
-			// Class is not present in this version, nothing to do.
-			return;
-		}
-
-		patchMoreOptionsDialog(classNode);
-		classEmitter.accept(classNode);
+		return ClassTransformerBuilder.create("tinyFdFix", ClassTransformHandler.FULL_CLASS_NODE_APPLICATOR)
+				.addRuntimeNameTarget(className, true)
+				.setPhase(ClassTransformPhases.BEFORE_MIXIN)
+				.setTransformer(TinyFDPatch::transform)
+				.build();
 	}
 
-	private void patchMoreOptionsDialog(ClassNode classNode) {
+	private static TransformResult<ClassNode> transform(ClassNode classNode, ClassTransformContext<ClassNode> context) {
 		for (MethodNode method : classNode.methods) {
 			final ListIterator<AbstractInsnNode> iterator = findTargetMethodNode(method);
 
@@ -95,7 +96,8 @@ public final class TinyFDPatch extends GamePatch {
 					insnList.add(new LdcInsnNode(DIALOG_TITLE));
 
 					method.instructions.insert(insnNode, insnList);
-					return;
+
+					return TransformResult.changed(classNode);
 				}
 			}
 
@@ -104,9 +106,11 @@ public final class TinyFDPatch extends GamePatch {
 
 		// At this point we failed to find a valid target method.
 		// 20w20a and 20w20b have the class but do not use tinyfd
+
+		return TransformResult.same(classNode);
 	}
 
-	private ListIterator<AbstractInsnNode> findTargetMethodNode(MethodNode methodNode) {
+	private static ListIterator<AbstractInsnNode> findTargetMethodNode(MethodNode methodNode) {
 		if ((methodNode.access & Opcodes.ACC_SYNTHETIC) == 0) {
 			// We know it's in a synthetic method
 			return null;

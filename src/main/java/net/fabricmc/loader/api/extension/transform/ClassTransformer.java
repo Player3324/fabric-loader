@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package net.fabricmc.loader.impl.discovery;
+package net.fabricmc.loader.api.extension.transform;
 
-import net.fabricmc.loader.impl.util.PhaseSorting;
+import org.jetbrains.annotations.Nullable;
 
-public final class LoadPhases {
-	public static final String DEFAULT = "default";
-
-	public static void setDefaultOrder(PhaseSorting<String, ?> sorting) {
-		sorting.addPhaseOrdering("updater", "adapter", DEFAULT);
-	}
+public interface ClassTransformer<T> {
+	boolean canGenerate();
+	boolean canTransform();
+	@Nullable T generate(ClassTransformContext<T> context);
+	TransformResult<T> transform(T input, ClassTransformContext<T> context);
 }

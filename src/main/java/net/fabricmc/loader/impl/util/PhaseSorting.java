@@ -100,6 +100,13 @@ public final class PhaseSorting<P extends Comparable<P>, E> {
 		sortPhases();
 	}
 
+	@SafeVarargs
+	public final void addPhaseOrdering(P... phases) {
+		for (int i = 0; i < phases.length - 1; i++) {
+			addPhaseOrdering(phases[i], phases[i + 1]);
+		}
+	}
+
 	public List<P> getUsedPhases() {
 		List<P> ret = new ArrayList<>(sortedPhases.size());
 

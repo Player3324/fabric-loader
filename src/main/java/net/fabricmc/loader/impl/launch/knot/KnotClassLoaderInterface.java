@@ -34,8 +34,6 @@ interface KnotClassLoaderInterface {
 		}
 	}
 
-	void initializeTransformers();
-
 	ClassLoader getClassLoader();
 
 	void addCodeSource(Path path);

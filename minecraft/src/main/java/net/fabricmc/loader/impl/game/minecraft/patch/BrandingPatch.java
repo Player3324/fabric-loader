@@ -17,8 +17,6 @@
 package net.fabricmc.loader.impl.game.minecraft.patch;
 
 import java.util.ListIterator;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
@@ -26,30 +24,27 @@ import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.MethodInsnNode;
 import org.objectweb.asm.tree.MethodNode;
 
+import net.fabricmc.loader.api.extension.transform.ClassTransformContext;
+import net.fabricmc.loader.api.extension.transform.ClassTransformPhases;
+import net.fabricmc.loader.api.extension.transform.ClassTransformer;
+import net.fabricmc.loader.api.extension.transform.ClassTransformerBuilder;
+import net.fabricmc.loader.api.extension.transform.TransformResult;
 import net.fabricmc.loader.impl.game.minecraft.Hooks;
-import net.fabricmc.loader.impl.game.patch.GamePatch;
-import net.fabricmc.loader.impl.launch.FabricLauncher;
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
 
-public final class BrandingPatch extends GamePatch {
-	@Override
-	public void process(FabricLauncher launcher, Function<String, ClassNode> classSource, Consumer<ClassNode> classEmitter) {
-		for (String brandClassName : new String[] {
-				"net.minecraft.client.ClientBrandRetriever",
-				"net.minecraft.server.MinecraftServer"
-		}) {
-			ClassNode brandClass = classSource.apply(brandClassName);
-
-			if (brandClass != null) {
-				if (applyBrandingPatch(brandClass)) {
-					classEmitter.accept(brandClass);
-				}
-			}
-		}
+public final class BrandingPatch {
+	public static ClassTransformer<?> create() {
+		return ClassTransformerBuilder.create("branding", ClassTransformHandler.FULL_CLASS_NODE_APPLICATOR)
+				.addRuntimeNameTarget("net/minecraft/client/ClientBrandRetriever", true)
+				.addRuntimeNameTarget("net/minecraft/server/MinecraftServer", true)
+				.setPhase(ClassTransformPhases.BEFORE_MIXIN)
+				.setTransformer(BrandingPatch::transform)
+				.build();
 	}
 
-	private boolean applyBrandingPatch(ClassNode classNode) {
+	private static TransformResult<ClassNode> transform(ClassNode classNode, ClassTransformContext<ClassNode> context) {
 		boolean applied = false;
 
 		for (MethodNode node : classNode.methods) {
@@ -70,6 +65,6 @@ public final class BrandingPatch extends GamePatch {
 			}
 		}
 
-		return applied;
+		return TransformResult.create(classNode, applied);
 	}
 }

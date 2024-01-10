@@ -24,7 +24,6 @@ import java.util.Set;
 
 import net.fabricmc.api.Environment;
 import net.fabricmc.loader.api.metadata.ModMetadata;
-import net.fabricmc.loader.impl.game.patch.GameTransformer;
 import net.fabricmc.loader.impl.launch.FabricLauncher;
 import net.fabricmc.loader.impl.util.Arguments;
 import net.fabricmc.loader.impl.util.LoaderUtil;
@@ -62,7 +61,6 @@ public interface GameProvider { // name directly referenced in net.fabricmc.load
 	boolean isEnabled();
 	boolean locateGame(FabricLauncher launcher, String[] args);
 	void initialize(FabricLauncher launcher);
-	GameTransformer getEntrypointTransformer();
 	void unlockClassPath(FabricLauncher launcher);
 	void launch(ClassLoader loader);
 

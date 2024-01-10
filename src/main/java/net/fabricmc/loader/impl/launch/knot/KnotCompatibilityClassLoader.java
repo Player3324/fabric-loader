@@ -18,6 +18,7 @@ package net.fabricmc.loader.impl.launch.knot;
 
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.ByteBuffer;
 import java.security.CodeSource;
 
 import net.fabricmc.api.EnvType;
@@ -83,8 +84,8 @@ class KnotCompatibilityClassLoader extends URLClassLoader implements ClassLoader
 	}
 
 	@Override
-	public Class<?> defineClassFwd(String name, byte[] b, int off, int len, CodeSource cs) {
-		return super.defineClass(name, b, off, len, cs);
+	public Class<?> defineClassFwd(String name, ByteBuffer data, CodeSource cs) {
+		return super.defineClass(name, data, cs);
 	}
 
 	@Override

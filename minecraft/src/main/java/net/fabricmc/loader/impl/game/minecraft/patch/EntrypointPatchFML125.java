@@ -16,63 +16,60 @@
 
 package net.fabricmc.loader.impl.game.minecraft.patch;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.util.function.Consumer;
-import java.util.function.Function;
+import java.nio.ByteBuffer;
 
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.commons.ClassRemapper;
 import org.objectweb.asm.commons.Remapper;
-import org.objectweb.asm.tree.ClassNode;
 
-import net.fabricmc.loader.impl.game.patch.GamePatch;
-import net.fabricmc.loader.impl.launch.FabricLauncher;
-import net.fabricmc.loader.impl.launch.knot.Knot;
+import net.fabricmc.loader.api.extension.transform.ClassTransformContext;
+import net.fabricmc.loader.api.extension.transform.ClassTransformPhases;
+import net.fabricmc.loader.api.extension.transform.ClassTransformer;
+import net.fabricmc.loader.api.extension.transform.ClassTransformerBuilder;
+import net.fabricmc.loader.api.extension.transform.TransformResult;
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.util.LoaderUtil;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
 
-public class EntrypointPatchFML125 extends GamePatch {
-	private static final String FROM = ModClassLoader_125_FML.class.getName();
-	private static final String TO = "cpw.mods.fml.common.ModClassLoader";
-	private static final String FROM_INTERNAL = FROM.replace('.', '/');
-	private static final String TO_INTERNAL = "cpw/mods/fml/common/ModClassLoader";
+/**
+ * Replace FML 1.2.5's ModClassLoader implementation with one that works on modern Java.
+ */
+public final class EntrypointPatchFML125 {
+	private static final String TO = "cpw/mods/fml/common/ModClassLoader";
 
-	@Override
-	public void process(FabricLauncher launcher, Function<String, ClassNode> classSource, Consumer<ClassNode> classEmitter) {
-		if (classSource.apply(TO) != null
-				&& classSource.apply("cpw.mods.fml.relauncher.FMLRelauncher") == null) {
-			if (!(launcher instanceof Knot)) {
-				throw new RuntimeException("1.2.5 FML patch only supported on Knot!");
-			}
+	public static ClassTransformer<?> create() {
+		return ClassTransformerBuilder.create("entrypoint-fml-1.2.5", ClassTransformHandler.BYTE_BUFFER_APPLICATOR)
+				.addRuntimeNameTarget(TO, true)
+				.setPhase(ClassTransformPhases.PATCH)
+				.setTransformer(EntrypointPatchFML125::transform)
+				.build();
+	}
 
-			Log.debug(LogCategory.GAME_PATCH, "Detected 1.2.5 FML - Knotifying ModClassLoader...");
-
-			// ModClassLoader_125_FML isn't in the game's class path, so it's loaded from the launcher's class path instead
-			ClassNode patchedClassLoader = new ClassNode();
-
-			try (InputStream stream = launcher.getResourceAsStream(LoaderUtil.getClassFileName(FROM))) {
-				if (stream != null) {
-					ClassReader patchedClassLoaderReader = new ClassReader(stream);
-					patchedClassLoaderReader.accept(patchedClassLoader, 0);
-				} else {
-					throw new IOException("Could not find class " + FROM + " in the launcher classpath while transforming ModClassLoader");
-				}
-			} catch (IOException e) {
-				throw new RuntimeException("An error occurred while reading class " + FROM + " while transforming ModClassLoader", e);
-			}
-
-			ClassNode remappedClassLoader = new ClassNode();
-
-			patchedClassLoader.accept(new ClassRemapper(remappedClassLoader, new Remapper() {
-				@Override
-				public String map(String internalName) {
-					return FROM_INTERNAL.equals(internalName) ? TO_INTERNAL : internalName;
-				}
-			}));
-
-			classEmitter.accept(remappedClassLoader);
+	private static TransformResult<ByteBuffer> transform(ByteBuffer input, ClassTransformContext<ByteBuffer> context) {
+		if (context.getClassBytes("cpw/mods/fml/relauncher/FMLRelauncher") != null) {
+			return TransformResult.same(input);
 		}
+
+		Log.debug(LogCategory.GAME_PATCH, "Detected 1.2.5 FML - Knotifying ModClassLoader...");
+
+		String from = LoaderUtil.getSlashName(ModClassLoader_125_FML.class.getName());
+
+		// Load alternative implementation bundled with Fabric Loader for substitution
+		ByteBuffer source = context.getClassBytes(LoaderUtil.getSlashName(ModClassLoader_125_FML.class.getName()));
+		assert source != null;
+
+		ClassReader reader = LoaderUtil.deserializeClass(source);
+		ClassWriter writer = new ClassWriter(0);
+
+		reader.accept(new ClassRemapper(writer, new Remapper() {
+			@Override
+			public String map(String internalName) {
+				return from.equals(internalName) ? TO : internalName;
+			}
+		}), 0);
+
+		return TransformResult.changed(ByteBuffer.wrap(writer.toByteArray()));
 	}
 }

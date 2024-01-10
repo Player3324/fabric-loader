@@ -19,6 +19,7 @@ package net.fabricmc.loader.impl.launch.knot;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Constructor;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,6 +36,8 @@ import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint;
@@ -57,6 +60,9 @@ public final class Knot extends FabricLauncherBase {
 	private final List<Path> classPath = new ArrayList<>();
 	private GameProvider provider;
 	private boolean unlocked;
+
+	private IMixinTransformer mixinTransformer;
+	private boolean transformInitialized = false;
 
 	public static void launch(String[] args, EnvType type) {
 		setupUncaughtExceptionHandler();
@@ -147,7 +153,7 @@ public final class Knot extends FabricLauncherBase {
 		FabricMixinBootstrap.init(loader);
 		FabricLauncherBase.finishMixinBootstrapping();
 
-		classLoader.initializeTransformers();
+		initializeMixinTransformer();
 
 		provider.unlockClassPath(this);
 		unlocked = true;
@@ -250,6 +256,34 @@ public final class Knot extends FabricLauncherBase {
 		}
 	}
 
+	private void initializeMixinTransformer() {
+		if (transformInitialized) throw new IllegalStateException("Cannot initialize Mixin transformer twice!");
+
+		mixinTransformer = MixinServiceKnot.getTransformer();
+
+		if (mixinTransformer == null) {
+			try { // reflective instantiation for older mixin versions
+				@SuppressWarnings("unchecked")
+				Constructor<IMixinTransformer> ctor = (Constructor<IMixinTransformer>) Class.forName("org.spongepowered.asm.mixin.transformer.MixinTransformer").getConstructor();
+				ctor.setAccessible(true);
+				mixinTransformer = ctor.newInstance();
+			} catch (ReflectiveOperationException e) {
+				Log.debug(LogCategory.KNOT, "Can't create Mixin transformer through reflection (only applicable for 0.8-0.8.2): %s", e);
+
+				// both lookups failed (not received through IMixinService.offer and not found through reflection)
+				throw new IllegalStateException("mixin transformer unavailable?");
+			}
+		}
+
+		transformInitialized = true;
+	}
+
+	@Override
+	public IMixinTransformer getMixinTransformer() {
+		assert mixinTransformer != null;
+		return mixinTransformer;
+	}
+
 	@Override
 	public List<Path> getClassPath() {
 		return classPath;
@@ -301,8 +335,8 @@ public final class Knot extends FabricLauncherBase {
 	}
 
 	@Override
-	public byte[] getClassByteArray(String name, boolean runTransformers) throws IOException {
-		if (!unlocked) throw new IllegalStateException("early getClassByteArray access");
+	public byte[] getClassByteArray(String name, boolean runTransformers, boolean allowEarlyAccess) throws IOException {
+		if (!allowEarlyAccess && !unlocked) throw new IllegalStateException("early getClassByteArray access");
 
 		if (runTransformers) {
 			return classLoader.getPreMixinClassBytes(name);
@@ -314,11 +348,6 @@ public final class Knot extends FabricLauncherBase {
 	@Override
 	public Manifest getManifest(Path originPath) {
 		return classLoader.getManifest(originPath);
-	}
-
-	@Override
-	public String getEntrypoint() {
-		return provider.getEntrypoint();
 	}
 
 	public static void main(String[] args) {

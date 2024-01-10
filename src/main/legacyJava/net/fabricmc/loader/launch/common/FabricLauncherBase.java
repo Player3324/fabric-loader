@@ -71,7 +71,7 @@ public class FabricLauncherBase implements FabricLauncher {
 
 	@Override
 	public byte[] getClassByteArray(String name, boolean runTransformers) throws IOException {
-		return parent.getClassByteArray(name, runTransformers);
+		return parent.getClassByteArray(name, runTransformers, false);
 	}
 
 	@Override

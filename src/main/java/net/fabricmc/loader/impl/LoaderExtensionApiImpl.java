@@ -16,7 +16,6 @@
 
 package net.fabricmc.loader.impl;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -25,11 +24,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
 
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.tree.ClassNode;
-
 import net.fabricmc.loader.api.extension.LoaderExtensionApi;
 import net.fabricmc.loader.api.extension.ModCandidate;
+import net.fabricmc.loader.api.extension.transform.ClassTransformApplicator;
+import net.fabricmc.loader.api.extension.transform.ClassTransformer;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
@@ -38,20 +36,18 @@ import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
 import net.fabricmc.loader.impl.metadata.ModMetadataBuilderImpl;
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
+import net.fabricmc.loader.impl.transformer.ClassTransformerImpl;
 
 public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	static final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>(); // TODO: use this
 	static final List<MixinConfigEntry> mixinConfigs = new ArrayList<>();
-	// TODO: use these:
-	static final List<TransformerEntry<ByteBuffer>> byteBufferTransformers = new ArrayList<>();
-	static final List<TransformerEntry<ClassVisitor>> classVisitorProviders = new ArrayList<>();
-	static final List<TransformerEntry<ClassNode>> classNodeTransformers = new ArrayList<>();
 
-	private final String pluginModId;
+	private final String extensionModId;
 	private final ResolutionContext context;
 
-	public LoaderExtensionApiImpl(String pluginModId, ResolutionContext context) {
-		this.pluginModId = pluginModId;
+	public LoaderExtensionApiImpl(String extensionModId, ResolutionContext context) {
+		this.extensionModId = extensionModId;
 		this.context = context;
 	}
 
@@ -198,41 +194,29 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		Objects.requireNonNull(mod, "null mod");
 		Objects.requireNonNull(location, "null location");
 
-		mixinConfigs.add(new MixinConfigEntry(pluginModId, mod.getId(), location));
+		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
 	}
 
 	@Override
-	public void addClassByteBufferTransformer(ClassTransformer<ByteBuffer> transformer, String phase) {
+	public <T> /*@Nullable*/ ClassTransformApplicator<T, ?> getClassTransformApplicator(Class<T> type, String subType) {
+		checkFrozen();
+		Objects.requireNonNull(type, "null type");
+		Objects.requireNonNull(subType, "null subType");
+
+		return ClassTransformHandler.getApplicator(type, subType);
+	}
+
+	@Override
+	public <T> void addClassTransformer(ClassTransformer<T> transformer) {
 		checkFrozen();
 		Objects.requireNonNull(transformer, "null transformer");
-		Objects.requireNonNull(phase, "null phase");
-		if (transformer.getName().isEmpty()) throw new IllegalArgumentException("transformer without name");
+		if (!(transformer instanceof ClassTransformerImpl<?>)) throw new IllegalArgumentException("invalid transformer class, use ClassTransformerBuilder");
 
-		byteBufferTransformers.add(new TransformerEntry<>(pluginModId, phase, transformer));
-	}
-
-	@Override
-	public void addClassVisitorProvider(ClassTransformer<ClassVisitor> provider, String phase) {
-		checkFrozen();
-		Objects.requireNonNull(provider, "null provider");
-		Objects.requireNonNull(phase, "null phase");
-		if (provider.getName().isEmpty()) throw new IllegalArgumentException("provider without name");
-
-		classVisitorProviders.add(new TransformerEntry<>(pluginModId, phase, provider));
-	}
-
-	@Override
-	public void addClassNodeTransformer(ClassTransformer<ClassNode> transformer, String phase) {
-		checkFrozen();
-		Objects.requireNonNull(transformer, "null transformer");
-		Objects.requireNonNull(phase, "null phase");
-		if (transformer.getName().isEmpty()) throw new IllegalArgumentException("transformer without name");
-
-		classNodeTransformers.add(new TransformerEntry<>(pluginModId, phase, transformer));
+		ClassTransformHandler.addTransformer((ClassTransformerImpl<T>) transformer, extensionModId);
 	}
 
 	private static void checkFrozen() {
-		if (FabricLoaderImpl.INSTANCE.isFrozen()) throw new IllegalStateException("loading progress advanced beyond where loader plugins may act");
+		if (FabricLoaderImpl.INSTANCE.isFrozen()) throw new IllegalStateException("loading progress advanced beyond where loader extensions may act");
 	}
 
 	public static List<MixinConfigEntry> getMixinConfigs() {

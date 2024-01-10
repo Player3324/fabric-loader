@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package net.fabricmc.loader.impl.discovery;
+package net.fabricmc.loader.api.extension.transform;
 
-import net.fabricmc.loader.impl.util.PhaseSorting;
+import java.nio.ByteBuffer;
 
-public final class LoadPhases {
-	public static final String DEFAULT = "default";
+import org.jetbrains.annotations.Nullable;
 
-	public static void setDefaultOrder(PhaseSorting<String, ?> sorting) {
-		sorting.addPhaseOrdering("updater", "adapter", DEFAULT);
-	}
+public interface ClassTransformContext<T> {
+	String getRuntimeClassName(); // in slash form (some/pkg/cls$sub$1)
+	@Nullable ByteBuffer getClassBytes(String runtimeClassName);
+	String getCommonSuperClass(String clsA, String clsB);
 }

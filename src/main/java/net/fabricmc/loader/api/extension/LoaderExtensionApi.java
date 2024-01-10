@@ -16,16 +16,14 @@
 
 package net.fabricmc.loader.api.extension;
 
-import java.net.URL;
-import java.nio.ByteBuffer;
 import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
-import org.objectweb.asm.ClassVisitor;
-import org.objectweb.asm.tree.ClassNode;
-
+import net.fabricmc.loader.api.extension.transform.ClassTransformApplicator;
+import net.fabricmc.loader.api.extension.transform.ClassTransformer;
+import net.fabricmc.loader.api.extension.transform.ClassTransformerBuilder;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 
@@ -49,15 +47,25 @@ public interface LoaderExtensionApi { // one instance per extension, binding the
 
 	void addMixinConfig(ModCandidate mod, String location);
 
-	void addClassByteBufferTransformer(ClassTransformer<ByteBuffer> transformer, String phase);
-	void addClassVisitorProvider(ClassTransformer<ClassVisitor> provider, String phase);
-	void addClassNodeTransformer(ClassTransformer<ClassNode> transformer, String phase);
+	/**
+	 * Get a bytecode transform applicator, handling transforming bytes with higher level representations.
+	 *
+	 * @param <T> transformable subject representation
+	 * @param type transformable subject representation type
+	 * @param subType implementation selection within the type, usually for controlling implementation behaviors
+	 * @return bytecode transform applicator
+	 */
+	<T> /*@Nullable*/ ClassTransformApplicator<T, ?> getClassTransformApplicator(Class<T> type, String subType);
 
-	interface ClassTransformer<T> {
-		String getName(); // name further identifying the transformer within the context mod
-		boolean appliesTo(String internalName, /*@Nullable*/ URL source);
-		/*@Nullable*/ T apply(String internalName, /*@Nullable*/ T input); // may reuse input!
-	}
+	/**
+	 * Register a new class bytecode transformer.
+	 *
+	 * @see ClassTransformerBuilder
+	 *
+	 * @param <T> transformable subject representation
+	 * @param transformer transformer to add, obtained from ClassTransformerBuilder
+	 */
+	<T> void addClassTransformer(ClassTransformer<T> transformer);
 
 	// TODO: resource transformers
 }

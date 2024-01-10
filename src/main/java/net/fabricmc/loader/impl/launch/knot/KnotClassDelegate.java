@@ -21,11 +21,11 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Constructor;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.ByteBuffer;
 import java.nio.file.FileSystemNotFoundException;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
@@ -46,13 +46,12 @@ import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
-import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
-
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
 import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.ClassLoaderAccess;
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.transformer.FabricTransformer;
 import net.fabricmc.loader.impl.util.ExceptionUtil;
 import net.fabricmc.loader.impl.util.FileSystemUtil;
@@ -90,8 +89,6 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	private final GameProvider provider;
 	private final boolean isDevelopment;
 	private final EnvType envType;
-	private IMixinTransformer mixinTransformer;
-	private boolean transformInitialized = false;
 	private volatile Set<Path> codeSources = Collections.emptySet();
 	private volatile Set<Path> validParentCodeSources = null; // null = disabled isolation, game provider has to set it to opt in
 	private final Map<Path, String[]> allowedPrefixes = new ConcurrentHashMap<>();
@@ -111,34 +108,6 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	@Override
 	public ClassLoader getClassLoader() {
 		return classLoader;
-	}
-
-	@Override
-	public void initializeTransformers() {
-		if (transformInitialized) throw new IllegalStateException("Cannot initialize KnotClassDelegate twice!");
-
-		mixinTransformer = MixinServiceKnot.getTransformer();
-
-		if (mixinTransformer == null) {
-			try { // reflective instantiation for older mixin versions
-				@SuppressWarnings("unchecked")
-				Constructor<IMixinTransformer> ctor = (Constructor<IMixinTransformer>) Class.forName("org.spongepowered.asm.mixin.transformer.MixinTransformer").getConstructor();
-				ctor.setAccessible(true);
-				mixinTransformer = ctor.newInstance();
-			} catch (ReflectiveOperationException e) {
-				Log.debug(LogCategory.KNOT, "Can't create Mixin transformer through reflection (only applicable for 0.8-0.8.2): %s", e);
-
-				// both lookups failed (not received through IMixinService.offer and not found through reflection)
-				throw new IllegalStateException("mixin transformer unavailable?");
-			}
-		}
-
-		transformInitialized = true;
-	}
-
-	private IMixinTransformer getMixinTransformer() {
-		assert mixinTransformer != null;
-		return mixinTransformer;
 	}
 
 	@Override
@@ -225,7 +194,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 			Class<?> c = classLoader.findLoadedClassFwd(name);
 
 			if (c == null) {
-				if (name.startsWith("java.")) { // fast path for java.** (can only be loaded by the platform CL anyway)
+				if (isKnownPlatformClass(name)) { // fast path for known platform classes
 					c = PLATFORM_CLASS_LOADER.loadClass(name);
 				} else {
 					c = tryLoadClass(name, false); // try local load
@@ -267,6 +236,11 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 
 			return c;
 		}
+	}
+
+	private static boolean isKnownPlatformClass(String name) {
+		return name.startsWith("java.") // java.** can only be loaded by the platform cl
+				|| name.startsWith("javax.swing."); // important for error gui
 	}
 
 	/**
@@ -333,10 +307,19 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 			}
 		}
 
-		byte[] input = getPostMixinClassByteArray(name, allowFromParent);
-		if (input == null) return null;
+		//byte[] input = getPostMixinClassByteArray(name, allowFromParent);
+		byte[] rawInput = getPreMixinClassByteArray(name, allowFromParent);
+		ByteBuffer input = rawInput != null ? ByteBuffer.wrap(rawInput) : null;
 
-		// The class we're currently loading could have been loaded already during Mixin initialization triggered by `getPostMixinClassByteArray`.
+		if (canTransformClass(name)) {
+			input = ClassTransformHandler.transform(input, name.replace('.', '/'));
+		}
+
+		if (input == null) {
+			return null;
+		}
+
+		// The class we're currently loading could have been loaded already during reentrant class loading while transforming.
 		// If this is the case, we want to return the instance that was already defined to avoid attempting a duplicate definition.
 		Class<?> existingClass = classLoader.findLoadedClassFwd(name);
 
@@ -365,7 +348,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 			}
 		}
 
-		return classLoader.defineClassFwd(name, input, 0, input.length, metadata.codeSource);
+		return classLoader.defineClassFwd(name, input, metadata.codeSource);
 	}
 
 	private Metadata getMetadata(String name) {
@@ -424,23 +407,6 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		});
 	}
 
-	private byte[] getPostMixinClassByteArray(String name, boolean allowFromParent) {
-		byte[] transformedClassArray = getPreMixinClassByteArray(name, allowFromParent);
-
-		if (!transformInitialized || !canTransformClass(name)) {
-			return transformedClassArray;
-		}
-
-		try {
-			return getMixinTransformer().transformClassBytes(name, name, transformedClassArray);
-		} catch (Throwable t) {
-			String msg = String.format("Mixin transformation of %s failed", name);
-			if (LOG_TRANSFORM_ERRORS) Log.warn(LogCategory.KNOT, msg, t);
-
-			throw new RuntimeException(msg, t);
-		}
-	}
-
 	@Override
 	public byte[] getPreMixinClassBytes(String name) {
 		return getPreMixinClassByteArray(name, true);
@@ -453,7 +419,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		// some of the transformers rely on dot notation
 		name = name.replace('/', '.');
 
-		if (!transformInitialized || !canTransformClass(name)) {
+		if (!canTransformClass(name)) {
 			try {
 				return getRawClassByteArray(name, allowFromParent);
 			} catch (IOException e) {
@@ -461,14 +427,12 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 			}
 		}
 
-		byte[] input = provider.getEntrypointTransformer().transform(name);
+		byte[] input;
 
-		if (input == null) {
-			try {
-				input = getRawClassByteArray(name, allowFromParent);
-			} catch (IOException e) {
-				throw new RuntimeException("Failed to load class file for '" + name + "'!", e);
-			}
+		try {
+			input = getRawClassByteArray(name, allowFromParent);
+		} catch (IOException e) {
+			throw new RuntimeException("Failed to load class file for '" + name + "'!", e);
 		}
 
 		if (input != null) {
@@ -479,9 +443,9 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	}
 
 	private static boolean canTransformClass(String name) {
-		name = name.replace('/', '.');
-		// Blocking Fabric Loader classes is no longer necessary here as they don't exist on the modding class loader
-		return /* !"net.fabricmc.api.EnvType".equals(name) && !name.startsWith("net.fabricmc.loader.") && */ !name.startsWith("org.apache.logging.log4j");
+		assert name.indexOf('/') < 0;
+
+		return !name.startsWith("org.apache.logging.log4j");
 	}
 
 	@Override
@@ -550,7 +514,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 
 		Object getClassLoadingLockFwd(String name);
 		Class<?> findLoadedClassFwd(String name);
-		Class<?> defineClassFwd(String name, byte[] b, int off, int len, CodeSource cs);
+		Class<?> defineClassFwd(String name, ByteBuffer data, CodeSource cs);
 		void resolveClassFwd(Class<?> cls);
 	}
 

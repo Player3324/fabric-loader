@@ -14,14 +14,13 @@
  * limitations under the License.
  */
 
-package net.fabricmc.loader.impl.discovery;
+package net.fabricmc.loader.api.extension.transform;
 
-import net.fabricmc.loader.impl.util.PhaseSorting;
-
-public final class LoadPhases {
+public final class ClassTransformPhases {
+	public static final String PATCH = "patch";
+	public static final String BEFORE_MIXIN = "beforeMixin";
+	public static final String MIXIN = "mixin";
+	public static final String AFTER_MIXIN = "afterMixin";
 	public static final String DEFAULT = "default";
-
-	public static void setDefaultOrder(PhaseSorting<String, ?> sorting) {
-		sorting.addPhaseOrdering("updater", "adapter", DEFAULT);
-	}
+	public static final String LATE = "late";
 }

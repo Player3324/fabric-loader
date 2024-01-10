@@ -53,11 +53,11 @@ public class MixinServiceKnot implements IMixinService, IClassProvider, IClassBy
 	}
 
 	public byte[] getClassBytes(String name, String transformedName) throws IOException {
-		return FabricLauncherBase.getLauncher().getClassByteArray(name, true);
+		return FabricLauncherBase.getLauncher().getClassByteArray(name, true, false);
 	}
 
 	public byte[] getClassBytes(String name, boolean runTransformers) throws ClassNotFoundException, IOException {
-		byte[] classBytes = FabricLauncherBase.getLauncher().getClassByteArray(name, runTransformers);
+		byte[] classBytes = FabricLauncherBase.getLauncher().getClassByteArray(name, runTransformers, false);
 
 		if (classBytes != null) {
 			return classBytes;

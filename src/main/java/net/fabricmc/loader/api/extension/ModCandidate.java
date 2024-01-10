@@ -29,7 +29,7 @@ import net.fabricmc.loader.api.metadata.ModMetadata;
  * <p>The data exposed here is read only, mutating it is not supported!
  */
 public interface ModCandidate {
-	ModMetadata getMetadata();
+	ModMetadata getMetadata(); // TODO: expose a broader representation with metadata that's normally hidden at runtime like entry points (unresolved form)
 	String getId();
 	Version getVersion();
 
