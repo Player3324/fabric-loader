@@ -54,6 +54,7 @@ public final class LibClassifier<L extends Enum<L> & LibraryType> {
 	private final Map<L, Path> origins;
 	private final Map<L, String> localPaths;
 	private final Set<Path> systemLibraries = new HashSet<>();
+	private final Set<Path> redundantLibraries = new HashSet<>();
 	private final List<Path> unmatchedOrigins = new ArrayList<>();
 
 	public LibClassifier(Class<L> cls, EnvType env, GameProvider gameProvider) throws IOException {
@@ -105,6 +106,14 @@ public final class LibClassifier<L extends Enum<L> & LibraryType> {
 				systemLibraries.add(path);
 
 				if (DEBUG) sb.append(String.format("✅ %s %s%n", lib.name(), path));
+
+				if (!lib.redundantPaths.isEmpty()) {
+					for (Path p : lib.redundantPaths) {
+						redundantLibraries.add(LoaderUtil.normalizeExistingPath(p));
+					}
+
+					if (DEBUG) sb.append(String.format("✳️ %s %s%n", lib.name(), lib.redundantPaths));
+				}
 			} else {
 				if (DEBUG) sb.append(String.format("❎ %s%n", lib.name()));
 			}
@@ -184,6 +193,7 @@ public final class LibClassifier<L extends Enum<L> & LibraryType> {
 	private void process(Path path, Set<L> excludedLibs) throws IOException {
 		path = LoaderUtil.normalizeExistingPath(path);
 		if (systemLibraries.contains(path)) return;
+		if (redundantLibraries.contains(path)) return;
 
 		boolean matched = false;
 

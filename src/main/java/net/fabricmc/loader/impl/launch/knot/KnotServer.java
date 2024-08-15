@@ -16,10 +16,24 @@
 
 package net.fabricmc.loader.impl.launch.knot;
 
+import java.lang.invoke.MethodHandle;
+
 import net.fabricmc.api.EnvType;
 
 public class KnotServer {
 	public static void main(String[] args) {
-		Knot.launch(args, EnvType.SERVER);
+		MethodHandle mh = CleanClassLoader.setup(EnvType.SERVER);
+
+		if (mh != null) {
+			try {
+				mh.invokeExact(args);
+			} catch (RuntimeException e) {
+				throw e;
+			} catch (Throwable t) {
+				throw new RuntimeException(t);
+			}
+		} else {
+			Knot.launch(args, EnvType.SERVER);
+		}
 	}
 }

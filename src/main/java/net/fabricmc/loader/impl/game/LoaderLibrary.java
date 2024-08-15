@@ -16,45 +16,34 @@
 
 package net.fabricmc.loader.impl.game;
 
-import java.net.URL;
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
 
-import org.objectweb.asm.ClassReader;
-import org.objectweb.asm.commons.Remapper;
-import org.objectweb.asm.tree.ClassNode;
-import org.objectweb.asm.tree.analysis.Analyzer;
-import org.objectweb.asm.util.CheckClassAdapter;
-import org.sat4j.pb.SolverFactory;
-import org.sat4j.specs.ContradictionException;
-import org.spongepowered.asm.launch.MixinBootstrap;
-
-import net.fabricmc.accesswidener.AccessWidener;
 import net.fabricmc.api.EnvType;
-import net.fabricmc.loader.impl.util.UrlConversionException;
+import net.fabricmc.loader.impl.game.LibraryUtil.LibraryLocation;
 import net.fabricmc.loader.impl.util.UrlUtil;
-import net.fabricmc.mappingio.tree.MappingTree;
-import net.fabricmc.tinyremapper.TinyRemapper;
 
 enum LoaderLibrary {
 	FABRIC_LOADER(UrlUtil.LOADER_CODE_SOURCE),
-	MAPPING_IO(MappingTree.class),
-	SPONGE_MIXIN(MixinBootstrap.class),
-	TINY_REMAPPER(TinyRemapper.class),
-	ACCESS_WIDENER(AccessWidener.class),
-	ASM(ClassReader.class),
-	ASM_ANALYSIS(Analyzer.class),
-	ASM_COMMONS(Remapper.class),
-	ASM_TREE(ClassNode.class),
-	ASM_UTIL(CheckClassAdapter.class),
-	SAT4J_CORE(ContradictionException.class),
-	SAT4J_PB(SolverFactory.class),
+	MAPPING_IO("net/fabricmc/mappingio/tree/MappingTree.class"),
+	SPONGE_MIXIN("org/spongepowered/asm/launch/MixinBootstrap.class"),
+	TINY_REMAPPER("net/fabricmc/tinyremapper/TinyRemapper.class"),
+	ACCESS_WIDENER("net/fabricmc/accesswidener/AccessWidener.class"),
+	ASM("org/objectweb/asm/ClassReader.class"),
+	ASM_ANALYSIS("org/objectweb/asm/tree/analysis/Analyzer.class"),
+	ASM_COMMONS("org/objectweb/asm/commons/Remapper.class"),
+	ASM_TREE("org/objectweb/asm/tree/ClassNode.class"),
+	ASM_UTIL("org/objectweb/asm/util/CheckClassAdapter.class"),
+	SAT4J_CORE("org/sat4j/specs/ContradictionException.class"),
+	SAT4J_PB("org/sat4j/pb/SolverFactory.class"),
 	SERVER_LAUNCH("fabric-server-launch.properties", EnvType.SERVER), // installer generated jar to run setup loader's class path
 	SERVER_LAUNCHER("net/fabricmc/installer/ServerLauncher.class", EnvType.SERVER), // installer based launch-through method
-	JUNIT_API("org/junit/jupiter/api/Test.class", null),
-	JUNIT_PLATFORM_ENGINE("org/junit/platform/engine/TestEngine.class", null),
-	JUNIT_PLATFORM_LAUNCHER("org/junit/platform/launcher/core/LauncherFactory.class", null),
-	JUNIT_JUPITER("org/junit/jupiter/engine/JupiterTestEngine.class", null),
-	FABRIC_LOADER_JUNIT("net/fabricmc/loader/impl/junit/FabricLoaderLauncherSessionListener.class", null),
+	JUNIT_API("org/junit/jupiter/api/Test.class"),
+	JUNIT_PLATFORM_ENGINE("org/junit/platform/engine/TestEngine.class"),
+	JUNIT_PLATFORM_LAUNCHER("org/junit/platform/launcher/core/LauncherFactory.class"),
+	JUNIT_JUPITER("org/junit/jupiter/engine/JupiterTestEngine.class"),
+	FABRIC_LOADER_JUNIT("net/fabricmc/loader/impl/junit/FabricLoaderLauncherSessionListener.class"),
 
 	// Logging libraries are only loaded from the platform CL when running as a unit test.
 	LOG4J_API("org/apache/logging/log4j/LogManager.class", true),
@@ -64,40 +53,38 @@ enum LoaderLibrary {
 	SLF4J_API("org/slf4j/Logger.class", true);
 
 	final Path path;
+	final List<Path> redundantPaths;
 	final EnvType env;
 	final boolean junitRunOnly;
-
-	LoaderLibrary(Class<?> cls) {
-		this(UrlUtil.getCodeSource(cls));
-	}
 
 	LoaderLibrary(Path path) {
 		if (path == null) throw new RuntimeException("missing loader library "+name());
 
 		this.path = path;
+		this.redundantPaths = Collections.emptyList();
 		this.env = null;
 		this.junitRunOnly = false;
+	}
+
+	LoaderLibrary(String file) {
+		this(file, null, false);
 	}
 
 	LoaderLibrary(String file, EnvType env) {
 		this(file, env, false);
 	}
 
-	LoaderLibrary(String file, EnvType env, boolean junitRunOnly) {
-		URL url = LoaderLibrary.class.getClassLoader().getResource(file);
-
-		try {
-			this.path = url != null ? UrlUtil.getCodeSource(url, file) : null;
-			this.env = env;
-		} catch (UrlConversionException e) {
-			throw new RuntimeException(e);
-		}
-
-		this.junitRunOnly = junitRunOnly;
-	}
-
 	LoaderLibrary(String path, boolean loggerLibrary) {
 		this(path, null, loggerLibrary);
+	}
+
+	LoaderLibrary(String file, EnvType env, boolean junitRunOnly) {
+		LibraryLocation loc = LibraryUtil.locate(file);
+
+		this.path = loc.path;
+		this.redundantPaths = loc.redundantPaths;
+		this.env = env;
+		this.junitRunOnly = junitRunOnly;
 	}
 
 	boolean isApplicable(EnvType env, boolean junitRun) {
