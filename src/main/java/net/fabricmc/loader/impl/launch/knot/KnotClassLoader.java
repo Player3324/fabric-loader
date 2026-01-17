@@ -170,8 +170,4 @@ final class KnotClassLoader extends AbstractSecureClassLoader implements ClassLo
 	public void resolveClassFwd(Class<?> cls) {
 		super.resolveClass(cls);
 	}
-
-	static {
-		registerAsParallelCapable();
-	}
 }

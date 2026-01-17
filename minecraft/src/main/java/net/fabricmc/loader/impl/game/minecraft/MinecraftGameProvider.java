@@ -135,7 +135,7 @@ public class MinecraftGameProvider implements GameProvider {
 
 	@Override
 	public String getEntrypoint() {
-		return entrypoint;
+		return entrypoint.replace(".", "/");
 	}
 
 	@Override
