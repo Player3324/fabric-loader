@@ -134,7 +134,6 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		frozen = true;
 		discoverer = null;
 		ExpressionFunctions.registerLate(expressionFunctions);
-		ClassTransformHandler.activate();
 		finishModLoading();
 	}
 

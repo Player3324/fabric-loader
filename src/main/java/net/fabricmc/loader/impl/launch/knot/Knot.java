@@ -37,6 +37,8 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
+
 import org.spongepowered.asm.mixin.transformer.IMixinTransformer;
 
 import net.fabricmc.api.EnvType;
@@ -157,6 +159,8 @@ public final class Knot extends FabricLauncherBase {
 
 		provider.unlockClassPath(this);
 		unlocked = true;
+
+		ClassTransformHandler.activate();
 
 		try {
 			loader.invokeEntrypoints("preLaunch", PreLaunchEntrypoint.class, PreLaunchEntrypoint::onPreLaunch);

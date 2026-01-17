@@ -244,7 +244,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	}
 
 	/**
-	 * Check if an url is loadable by the parent class loader.
+	 * Check if a url is loadable by the parent class loader.
 	 *
 	 * <p>This handles explicit parent url whitelisting by {@link #validParentCodeSources} or shadowing by {@link #codeSources}
 	 */

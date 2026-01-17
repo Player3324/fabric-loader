@@ -74,7 +74,7 @@ public class EntrypointPatch {
 	}
 
 	private static Collection<String> findTarget(PatchData data, ClassTransformTargetAnalyzerContext<ClassNode> context) {
-		String gameEntrypoint = findGameEntrypoint(data, name -> context.getClass(name));
+		String gameEntrypoint = findGameEntrypoint(data, context::getClass);
 
 		if (!gameEntrypoint.equals(data.entrypoint) && !context.hasClass(gameEntrypoint)) {
 			throw new RuntimeException("Could not load game class " + gameEntrypoint + "!");
@@ -321,7 +321,7 @@ public class EntrypointPatch {
 			throw new RuntimeException("Could not find game constructor method in " + gameClass.name + "!");
 		}
 
-		boolean patched = false;
+		boolean patched;
 		Log.debug(LogCategory.GAME_PATCH, "Patching game constructor %s%s", gameMethod.name, gameMethod.desc);
 
 		if (data.envType == EnvType.SERVER) {
