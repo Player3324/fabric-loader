@@ -37,6 +37,7 @@ interface KnotClassLoaderInterface {
 	ClassLoader getClassLoader();
 
 	void addCodeSource(Path path);
+	void reserveCodeSource(Path path);
 	void setAllowedPrefixes(Path codeSource, String... prefixes);
 	void setValidParentClassPath(Collection<Path> codeSources);
 

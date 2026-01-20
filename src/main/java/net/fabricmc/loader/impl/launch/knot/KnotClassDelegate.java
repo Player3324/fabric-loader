@@ -90,6 +90,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	private final boolean isDevelopment;
 	private final EnvType envType;
 	private volatile Set<Path> codeSources = Collections.emptySet();
+	private volatile Set<Path> reservedCodeSources = Collections.emptySet();
 	private volatile Set<Path> validParentCodeSources = null; // null = disabled isolation, game provider has to set it to opt in
 	private final Map<Path, String[]> allowedPrefixes = new ConcurrentHashMap<>();
 	private final Set<String> parentSourcedClasses = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -132,6 +133,24 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		}
 
 		if (LOG_CLASS_LOAD_ERRORS) Log.info(LogCategory.KNOT, "added code source %s", path);
+	}
+
+	@Override
+	public void reserveCodeSource(Path path) {
+		path = LoaderUtil.normalizeExistingPath(path);
+
+		synchronized (this) {
+			Set<Path> reservedSources = this.reservedCodeSources;
+			if (reservedSources.contains(path)) return;
+
+			Set<Path> newReservedSources = new HashSet<>(reservedSources.size() + 1, 1);
+			newReservedSources.addAll(reservedSources);
+			newReservedSources.add(path);
+
+			this.reservedCodeSources = newReservedSources;
+		}
+
+		if (LOG_CLASS_LOAD_ERRORS) Log.info(LogCategory.KNOT, "reserved code source %s", path);
 	}
 
 	@Override
@@ -249,6 +268,14 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	 * <p>This handles explicit parent url whitelisting by {@link #validParentCodeSources} or shadowing by {@link #codeSources}
 	 */
 	private boolean isValidParentUrl(URL url, String fileName) {
+		return isValidParentUrl(url, fileName, codeSources);
+	}
+
+	private boolean isReservedParentUrl(URL url, String fileName) {
+		return isValidParentUrl(url, fileName, reservedCodeSources);
+	}
+
+	private boolean isValidParentUrl(URL url, String fileName, Set<Path> codeSources) {
 		if (url == null) return false;
 		if (DISABLE_ISOLATION) return true;
 		if (!hasRegularCodeSource(url)) return true;
@@ -462,8 +489,8 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 
 			url = parentClassLoader.getResource(name);
 
-			if (!isValidParentUrl(url, name)) {
-				if (LOG_CLASS_LOAD) Log.info(LogCategory.KNOT, "refusing to load class %s at %s from parent class loader", name, url != null ? getCodeSource(url, name) : "null");
+			if (!isValidParentUrl(url, name) || !isReservedParentUrl(url, name)) {
+				if (LOG_CLASS_LOAD) Log.info(LogCategory.KNOT, "refusing to get byte array of class %s at %s from parent class loader", name, url != null ? getCodeSource(url, name) : "null");
 
 				return null;
 			}

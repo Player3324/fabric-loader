@@ -301,6 +301,13 @@ public final class Knot extends FabricLauncherBase {
 	}
 
 	@Override
+	public void reserveToClassPath(Path path) {
+		Log.debug(LogCategory.KNOT, "Reserving " + path + " to classpath.");
+
+		classLoader.reserveCodeSource(path);
+	}
+
+	@Override
 	public void setAllowedPrefixes(Path path, String... prefixes) {
 		classLoader.setAllowedPrefixes(path, prefixes);
 	}

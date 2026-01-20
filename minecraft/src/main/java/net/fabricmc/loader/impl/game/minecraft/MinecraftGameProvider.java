@@ -56,6 +56,7 @@ import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.util.Arguments;
 import net.fabricmc.loader.impl.util.ExceptionUtil;
 import net.fabricmc.loader.impl.util.LoaderUtil;
+import net.fabricmc.loader.impl.util.SimpleClassPath;
 import net.fabricmc.loader.impl.util.SystemProperties;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
@@ -367,11 +368,24 @@ public class MinecraftGameProvider implements GameProvider {
 			for (int i = 0; i < gameJars.size(); i++) {
 				Path newJar = obfJars.get(names[i]);
 				Path oldJar = gameJars.set(i, newJar);
+				launcher.reserveToClassPath(newJar);
 
-				if (logJars.remove(oldJar)) logJars.add(newJar);
+				if (logJars.remove(oldJar)) {
+					logJars.add(newJar);
+				}
 			}
 
 			realmsJar = obfJars.get("realms");
+			if (realmsJar != null) launcher.reserveToClassPath(realmsJar);
+		} else { // game is deobfuscated
+			for (Path gameJar : gameJars) {
+				launcher.reserveToClassPath(gameJar);
+			}
+			if (realmsJar != null) launcher.reserveToClassPath(realmsJar);
+		}
+
+		for (Path miscGameLibrary : miscGameLibraries) {
+			launcher.reserveToClassPath(miscGameLibrary);
 		}
 
 		// Load the logger libraries on the platform CL when in a unit test
