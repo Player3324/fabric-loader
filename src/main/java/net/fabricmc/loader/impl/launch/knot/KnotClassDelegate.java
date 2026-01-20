@@ -268,14 +268,6 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	 * <p>This handles explicit parent url whitelisting by {@link #validParentCodeSources} or shadowing by {@link #codeSources}
 	 */
 	private boolean isValidParentUrl(URL url, String fileName) {
-		return isValidParentUrl(url, fileName, codeSources);
-	}
-
-	private boolean isReservedParentUrl(URL url, String fileName) {
-		return isValidParentUrl(url, fileName, reservedCodeSources);
-	}
-
-	private boolean isValidParentUrl(URL url, String fileName, Set<Path> codeSources) {
 		if (url == null) return false;
 		if (DISABLE_ISOLATION) return true;
 		if (!hasRegularCodeSource(url)) return true;
@@ -288,6 +280,15 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		} else { // reject urls shadowed by this cl
 			return !codeSources.contains(codeSource);
 		}
+	}
+
+	private boolean isReservedParentUrl(URL url, String fileName) {
+		if (url == null) return false;
+		if (DISABLE_ISOLATION) return true;
+		if (!hasRegularCodeSource(url)) return true;
+
+		Path codeSource = getCodeSource(url, fileName);
+		return !codeSources.contains(codeSource);
 	}
 
 	Class<?> tryLoadClass(String name, boolean allowFromParent) throws ClassNotFoundException {
@@ -489,7 +490,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 
 			url = parentClassLoader.getResource(name);
 
-			if (!isValidParentUrl(url, name) || !isReservedParentUrl(url, name)) {
+			if (!isValidParentUrl(url, name) && !isReservedParentUrl(url, name)) {
 				if (LOG_CLASS_LOAD) Log.info(LogCategory.KNOT, "refusing to get byte array of class %s at %s from parent class loader", name, url != null ? getCodeSource(url, name) : "null");
 
 				return null;

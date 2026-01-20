@@ -38,6 +38,7 @@ import java.util.function.Function;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.objectweb.asm.Opcodes;
 
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.classtweaker.api.ClassTweaker;
 import net.fabricmc.classtweaker.api.ClassTweakerReader;
@@ -133,6 +134,7 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 		frozen = true;
 		discoverer = null;
 		ExpressionFunctions.registerLate(expressionFunctions);
+		ClassTransformHandler.activate();
 		finishModLoading();
 	}
 

@@ -56,7 +56,6 @@ import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.util.Arguments;
 import net.fabricmc.loader.impl.util.ExceptionUtil;
 import net.fabricmc.loader.impl.util.LoaderUtil;
-import net.fabricmc.loader.impl.util.SimpleClassPath;
 import net.fabricmc.loader.impl.util.SystemProperties;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
@@ -381,6 +380,7 @@ public class MinecraftGameProvider implements GameProvider {
 			for (Path gameJar : gameJars) {
 				launcher.reserveToClassPath(gameJar);
 			}
+
 			if (realmsJar != null) launcher.reserveToClassPath(realmsJar);
 		}
 
