@@ -28,8 +28,6 @@ import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 
 public interface LoaderExtensionApi { // one instance per extension, binding the caller mod id
-	void addPathToCacheKey(Path path);
-	void setExternalModSource(); // referenced loader extension must run every time, even if all cache keys match
 
 	/*@Nullable*/ ModCandidate readMod(Path path, /*@Nullable*/ String namespace);
 	/*@Nullable*/ ModCandidate readMod(List<Path> paths, /*@Nullable*/ String namespace);

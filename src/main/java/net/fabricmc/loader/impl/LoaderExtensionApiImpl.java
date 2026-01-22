@@ -55,21 +55,6 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	}
 
 	@Override
-	public void addPathToCacheKey(Path path) {
-		checkFrozen();
-		Objects.requireNonNull(path, "null path");
-
-		// TODO Auto-generated method stub
-	}
-
-	@Override
-	public void setExternalModSource() {
-		checkFrozen();
-
-		// TODO Auto-generated method stub
-	}
-
-	@Override
 	public /*@Nullable*/ ModCandidate readMod(Path path, /*@Nullable*/ String namespace) {
 		Objects.requireNonNull(path, "null path");
 
