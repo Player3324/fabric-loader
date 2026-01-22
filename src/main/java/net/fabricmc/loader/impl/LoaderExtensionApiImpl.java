@@ -51,6 +51,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	public LoaderExtensionApiImpl(String extensionModId, ResolutionContext context) {
 		this.extensionModId = extensionModId;
 		this.context = context;
+		EXTENSIONS.add(this);
 	}
 
 	@Override
