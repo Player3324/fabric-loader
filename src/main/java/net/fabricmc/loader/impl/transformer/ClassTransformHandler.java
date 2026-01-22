@@ -28,7 +28,6 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.tree.ClassNode;
 
-import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.extension.transform.ClassTransformApplicator;
 import net.fabricmc.loader.api.extension.transform.ClassTransformContext;
 import net.fabricmc.loader.api.extension.transform.ClassTransformPhases;
@@ -108,8 +107,8 @@ public final class ClassTransformHandler {
 	public static void activate() {
 		assert !active;
 
-		runTargetAnalyzers();
 		initNames();
+		runTargetAnalyzers();
 		sortPhases();
 
 		active = true;
@@ -177,14 +176,12 @@ public final class ClassTransformHandler {
 
 		if (targets.isEmpty()) return;
 
-		String namespace = FabricLoader.getInstance().isDevelopmentEnvironment() ? null : "official";
-
 		for (String target : targets) {
 			if (target.indexOf('.') >= 0) {
 				throw new RuntimeException("name obtained from the target analyzer for transformer "+transformer+" needs to be in slash form (some/pkg/cls): "+target);
 			}
 
-			transformer.targets.add(new ClassTransformerImpl.Target(target, namespace, false));
+			transformer.targets.add(new ClassTransformerImpl.Target(target, null, false));
 		}
 	}
 
