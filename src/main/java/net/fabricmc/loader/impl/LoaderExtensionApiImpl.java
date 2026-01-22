@@ -40,9 +40,10 @@ import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.transformer.ClassTransformerImpl;
 
 public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
-	static final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>(); // TODO: use this
-	static final List<MixinConfigEntry> mixinConfigs = new ArrayList<>();
+	static final List<LoaderExtensionApiImpl> EXTENSIONS = new ArrayList<>();
 
+	private final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>();
+	private final List<MixinConfigEntry> mixinConfigs = new ArrayList<>();
 	private final String extensionModId;
 	private final ResolutionContext context;
 
@@ -197,6 +198,10 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
 	}
 
+	private List<MixinConfigEntry> getMixinConfig() {
+		return mixinConfigs;
+	}
+
 	@Override
 	public <T> /*@Nullable*/ ClassTransformApplicator<T, ?> getClassTransformApplicator(Class<T> type, String subType) {
 		checkFrozen();
@@ -220,7 +225,12 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	}
 
 	public static List<MixinConfigEntry> getMixinConfigs() {
-		return mixinConfigs;
+		return EXTENSIONS.stream()
+				.map(LoaderExtensionApiImpl::getMixinConfig)
+				.reduce(new ArrayList<>(), (a, b) -> {
+					a.addAll(b);
+					return a;
+				});
 	}
 
 	public static final class MixinConfigEntry {
