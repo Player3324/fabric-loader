@@ -22,11 +22,10 @@ import java.util.Collection;
 import java.util.jar.Manifest;
 
 import net.fabricmc.api.EnvType;
-import net.fabricmc.loader.impl.game.GameProvider;
 
 interface KnotClassLoaderInterface {
 	@SuppressWarnings("resource")
-	static KnotClassLoaderInterface create(boolean useCompatibility, boolean isDevelopment, EnvType envType, GameProvider provider) {
+	static KnotClassLoaderInterface create(boolean useCompatibility, boolean isDevelopment, EnvType envType) {
 		if (useCompatibility) {
 			return new KnotCompatibilityClassLoader(isDevelopment, envType).getDelegate();
 		} else {

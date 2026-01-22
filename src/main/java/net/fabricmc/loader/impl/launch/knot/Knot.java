@@ -138,7 +138,7 @@ public final class Knot extends FabricLauncherBase {
 		// Setup classloader
 		// TODO: Provide KnotCompatibilityClassLoader in non-exclusive-Fabric pre-1.13 environments?
 		boolean useCompatibility = provider.requiresUrlClassLoader() || SystemProperties.isSet(SystemProperties.USE_COMPAT_CL);
-		classLoader = KnotClassLoaderInterface.create(useCompatibility, isDevelopment(), envType, provider);
+		classLoader = KnotClassLoaderInterface.create(useCompatibility, isDevelopment(), envType);
 		ClassLoader cl = classLoader.getClassLoader();
 		Thread.currentThread().setContextClassLoader(cl);
 
