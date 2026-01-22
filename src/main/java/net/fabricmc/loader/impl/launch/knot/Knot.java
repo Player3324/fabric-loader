@@ -170,7 +170,7 @@ public final class Knot extends FabricLauncherBase {
 	private GameProvider createGameProvider(String[] args) {
 		// fast path with direct lookup
 
-		GameProvider embeddedGameProvider = findEmbedddedGameProvider();
+		GameProvider embeddedGameProvider = findEmbeddedGameProvider();
 
 		if (embeddedGameProvider != null
 				&& embeddedGameProvider.isEnabled()
@@ -219,7 +219,7 @@ public final class Knot extends FabricLauncherBase {
 	 *
 	 * <p>This is faster than going through service loader because it only looks at a single jar.
 	 */
-	private static GameProvider findEmbedddedGameProvider() {
+	private static GameProvider findEmbeddedGameProvider() {
 		try {
 			Path flPath = UrlUtil.getCodeSource(Knot.class);
 			if (flPath == null || !flPath.getFileName().toString().endsWith(".jar")) return null; // not a jar

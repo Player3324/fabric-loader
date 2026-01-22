@@ -28,9 +28,9 @@ interface KnotClassLoaderInterface {
 	@SuppressWarnings("resource")
 	static KnotClassLoaderInterface create(boolean useCompatibility, boolean isDevelopment, EnvType envType, GameProvider provider) {
 		if (useCompatibility) {
-			return new KnotCompatibilityClassLoader(isDevelopment, envType, provider).getDelegate();
+			return new KnotCompatibilityClassLoader(isDevelopment, envType).getDelegate();
 		} else {
-			return new KnotClassLoader(isDevelopment, envType, provider).getDelegate();
+			return new KnotClassLoader(isDevelopment, envType).getDelegate();
 		}
 	}
 

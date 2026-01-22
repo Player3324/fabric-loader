@@ -49,7 +49,6 @@ import java.util.zip.ZipFile;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
-import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.ClassLoaderAccess;
 import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
@@ -105,7 +104,6 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	private final T classLoader;
 	private final ClassLoader parentClassLoader;
 	private final ResourceLoaderAccess resourceAccess;
-	private final GameProvider provider;
 	private final boolean isDevelopment;
 	private final EnvType envType;
 	private volatile Set<Path> codeSources = Collections.emptySet();
@@ -116,13 +114,12 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	private static final Collection<Path> JVM_NATIVE_DIRS = computeJvmNativeDirs();
 	private static final Map<String, String> PROCESSED_NATIVES = new HashMap<>();
 
-	KnotClassDelegate(boolean isDevelopment, EnvType envType, T classLoader, ClassLoader parentClassLoader, GameProvider provider) {
+	KnotClassDelegate(boolean isDevelopment, EnvType envType, T classLoader, ClassLoader parentClassLoader) {
 		this.isDevelopment = isDevelopment;
 		this.envType = envType;
 		this.classLoader = classLoader;
 		this.parentClassLoader = parentClassLoader;
 		this.resourceAccess = new UrlResourceLoader(parentClassLoader);
-		this.provider = provider;
 	}
 
 	@Override
