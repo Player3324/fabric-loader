@@ -82,8 +82,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	}
 
 	static final class UrlResourceLoader extends URLClassLoader implements ResourceLoaderAccess {
-
-		public UrlResourceLoader(ClassLoader parent) {
+		UrlResourceLoader(ClassLoader parent) {
 			super(new URL[0], parent);
 		}
 
@@ -546,7 +545,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		Class<?> defineClassFwd(String name, ByteBuffer data, CodeSource cs);
 		void resolveClassFwd(Class<?> cls);
 	}
-	
+
 	interface ResourceLoaderAccess {
 		void addUrlFwd(URL url);
 		URL findResourceFwd(String name);
