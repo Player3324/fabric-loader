@@ -23,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import net.fabricmc.loader.api.extension.LoaderExtensionApi;
 import net.fabricmc.loader.api.extension.ModCandidate;
@@ -32,7 +33,7 @@ import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
-import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;
+import net.fabricmc.loader.impl.discovery.ResolutionContext;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
 import net.fabricmc.loader.impl.metadata.ModMetadataBuilderImpl;
@@ -40,7 +41,7 @@ import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.transformer.ClassTransformerImpl;
 
 public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
-	static final List<LoaderExtensionApiImpl> EXTENSIONS = new ArrayList<>();
+	private static final List<LoaderExtensionApiImpl> EXTENSIONS = new ArrayList<>();
 
 	private final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>();
 	private final List<MixinConfigEntry> mixinConfigs = new ArrayList<>();
@@ -181,6 +182,13 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		modSources.add(source);
 	}
 
+	private List<ModCandidateImpl> getExtensionModCandidates(ModDependency dep) {
+		if (modSources.isEmpty()) return Collections.emptyList();
+		return modSources.stream()
+				.map((f) -> (ModCandidateImpl) f.apply(dep))
+				.collect(Collectors.toList());
+	}
+
 	@Override
 	public void addToClassPath(Path path) {
 		checkFrozen();
@@ -233,6 +241,12 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 				});
 	}
 
+	public static List<ModCandidateImpl> getFromExtensions(ModDependency dep) {
+		List<ModCandidateImpl> candidates = new ArrayList<>();
+		EXTENSIONS.forEach((e) -> candidates.addAll(e.getExtensionModCandidates(dep)));
+		return candidates;
+	}
+
 	public static final class MixinConfigEntry {
 		public final String extensionModId;
 		public final String modId;
@@ -242,18 +256,6 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 			this.extensionModId = extensionModId;
 			this.modId = modId;
 			this.location = location;
-		}
-	}
-
-	static final class TransformerEntry<T> {
-		final String extensionModId;
-		final String phase;
-		final ClassTransformer<T> transformer;
-
-		TransformerEntry(String extensionModId, String phase, ClassTransformer<T> transformer) {
-			this.extensionModId = extensionModId;
-			this.phase = phase;
-			this.transformer = transformer;
 		}
 	}
 }
