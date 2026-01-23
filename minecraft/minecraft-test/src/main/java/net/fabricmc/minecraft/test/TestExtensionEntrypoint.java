@@ -63,10 +63,7 @@ public class TestExtensionEntrypoint implements LoaderExtensionEntrypoint {
 					+ "\"package\": \"net.fabricmc.minecraft.test.extension.mixin\", "
 					+ "\"compatibilityLevel\": \"JAVA_8\", "
 					+ "\"mixins\": [\"MixinFlintAndSteelItem\", \"MixinSoulFireBlock\"],"
-					+ "\"injectors\": {\"defaultRequire\": 1},"
-					// Note: Depending on your use case you may need to BYO refmap.
-					// We happen to be able to use the one that's compiled with the build of the test mod.
-					+ "\"refmap\": \"minecraft-test-refmap.json\""
+					+ "\"injectors\": {\"defaultRequire\": 1}"
 					+ "}"
 			);
 			api.addToClassPath(mixinDir);
