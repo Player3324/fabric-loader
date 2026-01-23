@@ -324,28 +324,33 @@ public class ModResolver {
 
 		// remove from allModsSorted and modsById
 
-		context.allModsSorted.removeAll(context.modsById.remove(mod.getId()));
+		List<ModCandidateImpl> candidates = context.modsById.remove(mod.getId());
+		if (candidates != null) context.allModsSorted.removeAll(candidates);
 
 		for (ProvidedMod provided : mod.getAdditionallyProvidedMods()) {
 			String id = provided.getId();
 
 			if (provided.isExclusive()) {
-				context.allModsSorted.removeAll(context.modsById.remove(id));
+				List<ModCandidateImpl> providedCandidates = context.modsById.remove(id);
+				if (providedCandidates != null) context.allModsSorted.removeAll(providedCandidates);
 			} else {
 				List<ModCandidateImpl> mods = context.modsById.get(id);
-				mods.remove(mod);
-				context.allModsSorted.remove(mod);
+				if (mods != null) {
+					mods.remove(mod);
+					context.allModsSorted.remove(mod);
 
-				for (Iterator<ModCandidateImpl> it = mods.iterator(); it.hasNext(); ) {
-					ModCandidateImpl m = it.next();
+					for (Iterator<ModCandidateImpl> it = mods.iterator(); it.hasNext(); ) {
+						ModCandidateImpl m = it.next();
 
-					if (!hasExclusiveId(m, id)) {
-						it.remove();
-						context.allModsSorted.remove(m);
+						if (!hasExclusiveId(m, id)) {
+							it.remove();
+							context.allModsSorted.remove(m);
+						}
 					}
+
+					if (mods.isEmpty()) context.modsById.remove(id);
 				}
 
-				if (mods.isEmpty()) context.modsById.remove(id);
 			}
 		}
 	}
