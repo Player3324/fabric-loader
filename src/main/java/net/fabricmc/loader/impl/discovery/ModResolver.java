@@ -335,6 +335,7 @@ public class ModResolver {
 				if (providedCandidates != null) context.allModsSorted.removeAll(providedCandidates);
 			} else {
 				List<ModCandidateImpl> mods = context.modsById.get(id);
+
 				if (mods != null) {
 					mods.remove(mod);
 					context.allModsSorted.remove(mod);
@@ -350,7 +351,6 @@ public class ModResolver {
 
 					if (mods.isEmpty()) context.modsById.remove(id);
 				}
-
 			}
 		}
 	}
