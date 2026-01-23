@@ -21,6 +21,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.function.Function;
 
+import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.extension.transform.ClassTransformApplicator;
 import net.fabricmc.loader.api.extension.transform.ClassTransformer;
 import net.fabricmc.loader.api.extension.transform.ClassTransformerBuilder;
@@ -44,6 +45,7 @@ public interface LoaderExtensionApi { // one instance per extension, binding the
 	// TODO: add a way to add virtual resources (name + content) and classes
 
 	void addMixinConfig(ModCandidate mod, String location);
+	void addMixinConfig(ModContainer mod, String location);
 
 	/**
 	 * Get a bytecode transform applicator, handling transforming bytes with higher level representations.

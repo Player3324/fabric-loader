@@ -25,6 +25,7 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.extension.LoaderExtensionApi;
 import net.fabricmc.loader.api.extension.ModCandidate;
 import net.fabricmc.loader.api.extension.transform.ClassTransformApplicator;
@@ -192,6 +193,15 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
 	}
 
+	@Override
+	public void addMixinConfig(ModContainer mod, String location) {
+		checkFrozen();
+		Objects.requireNonNull(mod, "null mod");
+		Objects.requireNonNull(location, "null location");
+
+		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getMetadata().getId(), location));
+	}
+
 	private List<MixinConfigEntry> getMixinConfig() {
 		return mixinConfigs;
 	}
@@ -230,7 +240,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	public static List<ModCandidateImpl> getFromExtensions(ModDependency dep) {
 		List<ModCandidateImpl> candidates = new ArrayList<>();
 		EXTENSIONS.forEach((e) -> candidates.addAll(e.getExtensionModCandidates(dep)));
-		return candidates;
+		return candidates.stream().filter(Objects::nonNull).collect(Collectors.toList());
 	}
 
 	public static final class MixinConfigEntry {
