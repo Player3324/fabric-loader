@@ -1,3 +1,19 @@
+/*
+ * Copyright 2016 FabricMC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package net.fabricmc.minecraft.test;
 
 import java.io.IOException;
@@ -47,7 +63,10 @@ public class TestExtensionEntrypoint implements LoaderExtensionEntrypoint {
 					+ "\"package\": \"net.fabricmc.minecraft.test.extension.mixin\", "
 					+ "\"compatibilityLevel\": \"JAVA_8\", "
 					+ "\"mixins\": [\"MixinFlintAndSteelItem\", \"MixinSoulFireBlock\"],"
-					+ "\"injectors\": {\"defaultRequire\": 1}"
+					+ "\"injectors\": {\"defaultRequire\": 1},"
+					// Note: Depending on your use case you may need to BYO refmap.
+					// We happen to be able to use the one that's compiled with the build of the test mod.
+					+ "\"refmap\": \"minecraft-test-refmap.json\""
 					+ "}"
 			);
 			api.addToClassPath(mixinDir);
