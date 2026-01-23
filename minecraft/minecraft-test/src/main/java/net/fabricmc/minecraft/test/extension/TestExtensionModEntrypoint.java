@@ -1,9 +1,9 @@
 package net.fabricmc.minecraft.test.extension;
 
-import net.fabricmc.api.ModInitializer;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import net.fabricmc.api.ModInitializer;
 
 @SuppressWarnings("unused")
 public class TestExtensionModEntrypoint implements ModInitializer {

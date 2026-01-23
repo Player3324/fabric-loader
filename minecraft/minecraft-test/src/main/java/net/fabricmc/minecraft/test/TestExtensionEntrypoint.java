@@ -1,5 +1,12 @@
 package net.fabricmc.minecraft.test;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.VersionParsingException;
@@ -8,13 +15,6 @@ import net.fabricmc.loader.api.extension.LoaderExtensionEntrypoint;
 import net.fabricmc.loader.api.extension.ModCandidate;
 import net.fabricmc.loader.api.extension.ModMetadataBuilder;
 import net.fabricmc.loader.api.metadata.ModDependency;
-
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
 
 public class TestExtensionEntrypoint implements LoaderExtensionEntrypoint {
 	@Override
@@ -35,19 +35,21 @@ public class TestExtensionEntrypoint implements LoaderExtensionEntrypoint {
 				if (dep.getModId().equals(testMod.getId())) {
 					return testMod;
 				}
+
 				return null;
 			});
 
 			// Test addToClassPath and addMixinConfig - Creates a config with mixins that don't already exist in one.
 			Path mixinDir = Files.createTempDirectory("extension_test_mixins");
 			Path mixinConfig = Files.createTempFile(mixinDir, "mixins", ".json");
-			Files.writeString(mixinConfig, "{" +
-					"\"required\": true, " +
-					"\"package\": \"net.fabricmc.minecraft.test.extension.mixin\", " +
-					"\"compatibilityLevel\": \"JAVA_8\", " +
-					"\"mixins\": [\"MixinFlintAndSteelItem\", \"MixinSoulFireBlock\"]," +
-					"\"injectors\": {\"defaultRequire\": 1}" +
-					"}");
+			Files.writeString(mixinConfig, "{"
+					+ "\"required\": true, "
+					+ "\"package\": \"net.fabricmc.minecraft.test.extension.mixin\", "
+					+ "\"compatibilityLevel\": \"JAVA_8\", "
+					+ "\"mixins\": [\"MixinFlintAndSteelItem\", \"MixinSoulFireBlock\"],"
+					+ "\"injectors\": {\"defaultRequire\": 1}"
+					+ "}"
+			);
 			api.addToClassPath(mixinDir);
 			Optional<ModContainer> container = FabricLoader.getInstance().getModContainer("minecraft-test");
 			api.addMixinConfig(container.orElseThrow(), mixinConfig.getFileName().toString());
