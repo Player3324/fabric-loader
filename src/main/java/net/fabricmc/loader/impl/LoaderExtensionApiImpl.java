@@ -42,17 +42,15 @@ import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.transformer.ClassTransformerImpl;
 
 public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
-	private static final List<LoaderExtensionApiImpl> EXTENSIONS = new ArrayList<>();
+	private static final List<MixinConfigEntry> CONFIGS = new ArrayList<>();
+	private static final List<Function<ModDependency, ModCandidate>> SOURCES = new ArrayList<>();
 
-	private final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>();
-	private final List<MixinConfigEntry> mixinConfigs = new ArrayList<>();
 	private final String extensionModId;
 	private final ResolutionContext context;
 
 	public LoaderExtensionApiImpl(String extensionModId, ResolutionContext context) {
 		this.extensionModId = extensionModId;
 		this.context = context;
-		EXTENSIONS.add(this);
 	}
 
 	@Override
@@ -166,14 +164,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		checkFrozen();
 		Objects.requireNonNull(source, "null source");
 
-		modSources.add(source);
-	}
-
-	private List<ModCandidateImpl> getExtensionModCandidates(ModDependency dep) {
-		if (modSources.isEmpty()) return Collections.emptyList();
-		return modSources.stream()
-				.map((f) -> (ModCandidateImpl) f.apply(dep))
-				.collect(Collectors.toList());
+		SOURCES.add(source);
 	}
 
 	@Override
@@ -190,7 +181,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		Objects.requireNonNull(mod, "null mod");
 		Objects.requireNonNull(location, "null location");
 
-		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
+		CONFIGS.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
 	}
 
 	@Override
@@ -199,11 +190,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		Objects.requireNonNull(mod, "null mod");
 		Objects.requireNonNull(location, "null location");
 
-		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getMetadata().getId(), location));
-	}
-
-	private List<MixinConfigEntry> getMixinConfig() {
-		return mixinConfigs;
+		CONFIGS.add(new MixinConfigEntry(extensionModId, mod.getMetadata().getId(), location));
 	}
 
 	@Override
@@ -229,18 +216,14 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	}
 
 	public static List<MixinConfigEntry> getMixinConfigs() {
-		return EXTENSIONS.stream()
-				.map(LoaderExtensionApiImpl::getMixinConfig)
-				.reduce(new ArrayList<>(), (a, b) -> {
-					a.addAll(b);
-					return a;
-				});
+		return CONFIGS;
 	}
 
 	public static List<ModCandidateImpl> getFromExtensions(ModDependency dep) {
-		List<ModCandidateImpl> candidates = new ArrayList<>();
-		EXTENSIONS.forEach((e) -> candidates.addAll(e.getExtensionModCandidates(dep)));
-		return candidates.stream().filter(Objects::nonNull).collect(Collectors.toList());
+		return SOURCES.stream()
+				.map((f) -> (ModCandidateImpl) f.apply(dep))
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
 	}
 
 	public static final class MixinConfigEntry {
