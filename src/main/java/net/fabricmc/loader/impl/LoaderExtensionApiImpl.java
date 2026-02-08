@@ -23,7 +23,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
+import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.extension.LoaderExtensionApi;
 import net.fabricmc.loader.api.extension.ModCandidate;
 import net.fabricmc.loader.api.extension.transform.ClassTransformApplicator;
@@ -32,7 +34,7 @@ import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
-import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;
+import net.fabricmc.loader.impl.discovery.ResolutionContext;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
 import net.fabricmc.loader.impl.metadata.ModMetadataBuilderImpl;
@@ -40,8 +42,8 @@ import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.transformer.ClassTransformerImpl;
 
 public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
-	static final List<Function<ModDependency, ModCandidate>> modSources = new ArrayList<>(); // TODO: use this
-	static final List<MixinConfigEntry> mixinConfigs = new ArrayList<>();
+	private static final List<MixinConfigEntry> CONFIGS = new ArrayList<>();
+	private static final List<Function<ModDependency, ModCandidate>> SOURCES = new ArrayList<>();
 
 	private final String extensionModId;
 	private final ResolutionContext context;
@@ -49,21 +51,6 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	public LoaderExtensionApiImpl(String extensionModId, ResolutionContext context) {
 		this.extensionModId = extensionModId;
 		this.context = context;
-	}
-
-	@Override
-	public void addPathToCacheKey(Path path) {
-		checkFrozen();
-		Objects.requireNonNull(path, "null path");
-
-		// TODO Auto-generated method stub
-	}
-
-	@Override
-	public void setExternalModSource() {
-		checkFrozen();
-
-		// TODO Auto-generated method stub
 	}
 
 	@Override
@@ -177,7 +164,7 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		checkFrozen();
 		Objects.requireNonNull(source, "null source");
 
-		modSources.add(source);
+		SOURCES.add(source);
 	}
 
 	@Override
@@ -194,7 +181,16 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 		Objects.requireNonNull(mod, "null mod");
 		Objects.requireNonNull(location, "null location");
 
-		mixinConfigs.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
+		CONFIGS.add(new MixinConfigEntry(extensionModId, mod.getId(), location));
+	}
+
+	@Override
+	public void addMixinConfig(ModContainer mod, String location) {
+		checkFrozen();
+		Objects.requireNonNull(mod, "null mod");
+		Objects.requireNonNull(location, "null location");
+
+		CONFIGS.add(new MixinConfigEntry(extensionModId, mod.getMetadata().getId(), location));
 	}
 
 	@Override
@@ -220,7 +216,14 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 	}
 
 	public static List<MixinConfigEntry> getMixinConfigs() {
-		return mixinConfigs;
+		return CONFIGS;
+	}
+
+	public static List<ModCandidateImpl> getFromExtensions(ModDependency dep) {
+		return SOURCES.stream()
+				.map((f) -> (ModCandidateImpl) f.apply(dep))
+				.filter(Objects::nonNull)
+				.collect(Collectors.toList());
 	}
 
 	public static final class MixinConfigEntry {
@@ -232,18 +235,6 @@ public final class LoaderExtensionApiImpl implements LoaderExtensionApi {
 			this.extensionModId = extensionModId;
 			this.modId = modId;
 			this.location = location;
-		}
-	}
-
-	static final class TransformerEntry<T> {
-		final String extensionModId;
-		final String phase;
-		final ClassTransformer<T> transformer;
-
-		TransformerEntry(String extensionModId, String phase, ClassTransformer<T> transformer) {
-			this.extensionModId = extensionModId;
-			this.phase = phase;
-			this.transformer = transformer;
 		}
 	}
 }

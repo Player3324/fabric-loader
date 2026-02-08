@@ -34,7 +34,6 @@ import java.util.stream.Collectors;
 import net.fabricmc.loader.api.SemanticVersion;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.version.VersionInterval;
-import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;
 import net.fabricmc.loader.impl.discovery.ModSolver.AddModVar;
 import net.fabricmc.loader.impl.discovery.ModSolver.InactiveReason;
 import net.fabricmc.loader.impl.metadata.AbstractModMetadata;
@@ -86,21 +85,18 @@ final class ResultAnalyzer {
 			if (SHOW_INACTIVE && result.fix != null && !result.fix.inactiveMods.isEmpty()) {
 				pw.printf("\n%s", Localization.format("resolution.inactiveMods"));
 
-				List<Map.Entry<ModCandidateImpl, InactiveReason>> entries = new ArrayList<>(result.fix.inactiveMods.entrySet());
+				List<Entry<ModCandidateImpl, InactiveReason>> entries = new ArrayList<>(result.fix.inactiveMods.entrySet());
 
 				// sort by root, id, version
-				entries.sort(new Comparator<Map.Entry<ModCandidateImpl, ?>>() {
-					@Override
-					public int compare(Entry<ModCandidateImpl, ?> o1, Entry<ModCandidateImpl, ?> o2) {
-						ModCandidateImpl a = o1.getKey();
-						ModCandidateImpl b = o2.getKey();
+				entries.sort((Comparator<Entry<ModCandidateImpl, ?>>) (o1, o2) -> {
+					ModCandidateImpl a = o1.getKey();
+					ModCandidateImpl b = o2.getKey();
 
-						if (a.isRoot() != b.isRoot()) {
-							return a.isRoot() ? -1 : 1;
-						}
-
-						return ModCandidateImpl.ID_VERSION_COMPARATOR.compare(a, b);
+					if (a.isRoot() != b.isRoot()) {
+						return a.isRoot() ? -1 : 1;
 					}
+
+					return ModCandidateImpl.ID_VERSION_COMPARATOR.compare(a, b);
 				});
 
 				for (Map.Entry<ModCandidateImpl, InactiveReason> entry : entries) {

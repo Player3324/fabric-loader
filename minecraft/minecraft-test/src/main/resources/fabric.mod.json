@@ -12,6 +12,9 @@
   "entrypoints": {
     "main": [
       "net.fabricmc.minecraft.test.TestEntrypoint"
+    ],
+    "extension": [
+      "net.fabricmc.minecraft.test.TestExtensionEntrypoint"
     ]
   }
 }

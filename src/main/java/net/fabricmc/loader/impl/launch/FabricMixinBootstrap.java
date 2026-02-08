@@ -115,11 +115,6 @@ public final class FabricMixinBootstrap {
 			}
 		}
 
-		for (Config config : Mixins.getConfigs()) {
-			ModContainerImpl mod = configToModMap.get(config.getName());
-			if (mod == null) continue;
-		}
-
 		try {
 			IMixinConfig.class.getMethod("decorate", String.class, Object.class);
 			MixinConfigDecorator.apply(configToModMap, loader.getEnvironmentType());

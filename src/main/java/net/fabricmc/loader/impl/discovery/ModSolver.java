@@ -30,6 +30,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 import org.sat4j.pb.IPBSolver;
@@ -40,6 +41,7 @@ import org.sat4j.pb.tools.WeightedObject;
 import org.sat4j.specs.ContradictionException;
 import org.sat4j.specs.TimeoutException;
 
+import net.fabricmc.loader.impl.LoaderExtensionApiImpl;
 import net.fabricmc.loader.api.SemanticVersion;
 import net.fabricmc.loader.api.Version;
 import net.fabricmc.loader.api.metadata.ModDependency;
@@ -47,7 +49,6 @@ import net.fabricmc.loader.api.metadata.ModLoadCondition;
 import net.fabricmc.loader.api.metadata.version.VersionInterval;
 import net.fabricmc.loader.api.metadata.version.VersionPredicate;
 import net.fabricmc.loader.impl.discovery.Explanation.ErrorKind;
-import net.fabricmc.loader.impl.discovery.ModResolver.ResolutionContext;
 import net.fabricmc.loader.impl.metadata.ModDependencyImpl;
 import net.fabricmc.loader.impl.util.SystemProperties;
 import net.fabricmc.loader.impl.util.log.Log;
@@ -331,10 +332,10 @@ final class ModSolver {
 				AddModVar mod = (AddModVar) obj;
 				List<ModCandidateImpl> replaced = new ArrayList<>();
 
-				ModCandidateImpl selectedMod = context.selectedMods.get(obj.getId());
+				ModCandidateImpl selectedMod = context.selectedMods.get(mod.getId());
 				if (selectedMod != null) replaced.add(selectedMod);
 
-				List<ModCandidateImpl> mods = context.modsById.get(obj.getId());
+				List<ModCandidateImpl> mods = context.modsById.get(mod.getId());
 				if (mods != null) replaced.addAll(mods);
 
 				if (replaced.isEmpty()) {
@@ -599,13 +600,8 @@ final class ModSolver {
 				if (dep.isDisabledByCondition(context.expressionFunctions, mod.getId())) continue;
 				if (context.selectedMods.containsKey(dep.getModId())) continue;
 
-				List<ModCandidateImpl> available = context.modsById.get(dep.getModId());
-
-				if (available != null) {
-					for (ModCandidateImpl m : available) {
-						if (ModResolver.depMatches(dep, m)) suitableMods.add(m);
-					}
-				}
+				testDepCandidates(dep, context.modsById.get(dep.getModId()), suitableMods::add);
+				testDepCandidates(dep, LoaderExtensionApiImpl.getFromExtensions(dep), suitableMods::add);
 
 				if (installableMods != null) {
 					List<AddModVar> installable = installableMods.get(dep.getModId());
@@ -721,13 +717,8 @@ final class ModSolver {
 					}
 				}
 
-				List<ModCandidateImpl> available = context.modsById.get(dep.getModId());
-
-				if (available != null) {
-					for (ModCandidateImpl m : available) {
-						if (ModResolver.depMatches(dep, m)) suitableMods.add(m);
-					}
-				}
+				testDepCandidates(dep, context.modsById.get(dep.getModId()), suitableMods::add);
+				testDepCandidates(dep, LoaderExtensionApiImpl.getFromExtensions(dep), suitableMods::add);
 
 				if (installableMods != null) {
 					List<AddModVar> installable = installableMods.get(dep.getModId());
@@ -968,6 +959,14 @@ final class ModSolver {
 	}
 
 	private static final BigInteger TWO = BigInteger.valueOf(2);
+
+	private static void testDepCandidates(ModDependency dep, List<ModCandidateImpl> candidates, Consumer<ModCandidateImpl> onMatch) {
+		if (candidates == null || candidates.isEmpty()) return;
+
+		for (ModCandidateImpl m : candidates) {
+			if (ModResolver.depMatches(dep, m)) onMatch.accept(m);
+		}
+	}
 
 	private static DependencyHelper<DomainObject, Explanation> createDepHelper(IPBSolver solver) {
 		DependencyHelper<DomainObject, Explanation> ret = new DependencyHelper<>(solver); // new LexicoHelper<>(solver)

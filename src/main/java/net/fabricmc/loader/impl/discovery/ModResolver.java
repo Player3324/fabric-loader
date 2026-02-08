@@ -19,15 +19,10 @@ package net.fabricmc.loader.impl.discovery;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Comparator;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.Iterator;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -35,17 +30,12 @@ import java.util.stream.Collectors;
 import org.sat4j.specs.ContradictionException;
 import org.sat4j.specs.TimeoutException;
 
-import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.api.Version;
-import net.fabricmc.loader.api.extension.ModCandidate;
 import net.fabricmc.loader.api.metadata.ModDependency;
 import net.fabricmc.loader.api.metadata.ModDependency.Kind;
 import net.fabricmc.loader.api.metadata.ProvidedMod;
 import net.fabricmc.loader.impl.discovery.ModSolver.InactiveReason;
 import net.fabricmc.loader.impl.metadata.ModDependencyImpl;
-import net.fabricmc.loader.impl.util.Expression.DynamicFunction;
-import net.fabricmc.loader.impl.util.Expression.ExpressionEvaluateException;
-import net.fabricmc.loader.impl.util.ExpressionFunctions;
 import net.fabricmc.loader.impl.util.PhaseSorting;
 import net.fabricmc.loader.impl.util.log.Log;
 import net.fabricmc.loader.impl.util.log.LogCategory;
@@ -334,28 +324,33 @@ public class ModResolver {
 
 		// remove from allModsSorted and modsById
 
-		context.allModsSorted.removeAll(context.modsById.remove(mod.getId()));
+		List<ModCandidateImpl> candidates = context.modsById.remove(mod.getId());
+		if (candidates != null) context.allModsSorted.removeAll(candidates);
 
 		for (ProvidedMod provided : mod.getAdditionallyProvidedMods()) {
 			String id = provided.getId();
 
 			if (provided.isExclusive()) {
-				context.allModsSorted.removeAll(context.modsById.remove(id));
+				List<ModCandidateImpl> providedCandidates = context.modsById.remove(id);
+				if (providedCandidates != null) context.allModsSorted.removeAll(providedCandidates);
 			} else {
 				List<ModCandidateImpl> mods = context.modsById.get(id);
-				mods.remove(mod);
-				context.allModsSorted.remove(mod);
 
-				for (Iterator<ModCandidateImpl> it = mods.iterator(); it.hasNext(); ) {
-					ModCandidateImpl m = it.next();
+				if (mods != null) {
+					mods.remove(mod);
+					context.allModsSorted.remove(mod);
 
-					if (!hasExclusiveId(m, id)) {
-						it.remove();
-						context.allModsSorted.remove(m);
+					for (Iterator<ModCandidateImpl> it = mods.iterator(); it.hasNext(); ) {
+						ModCandidateImpl m = it.next();
+
+						if (!hasExclusiveId(m, id)) {
+							it.remove();
+							context.allModsSorted.remove(m);
+						}
 					}
-				}
 
-				if (mods.isEmpty()) context.modsById.remove(id);
+					if (mods.isEmpty()) context.modsById.remove(id);
+				}
 			}
 		}
 	}
@@ -368,146 +363,6 @@ public class ModResolver {
 		}
 
 		return false;
-	}
-
-	public static final class ResolutionContext {
-		final Collection<ModCandidateImpl> initialMods;
-		public final EnvType envType;
-		public final Map<String, DynamicFunction> expressionFunctions;
-		final Map<String, Set<ModCandidateImpl>> envDisabledMods;
-		final PhaseSelectHandler phaseSelectHandler;
-
-		final List<ModCandidateImpl> allModsSorted;
-		final Map<String, List<ModCandidateImpl>> modsById = new LinkedHashMap<>(); // linked to ensure consistent execution
-		final Map<String, ModCandidateImpl> selectedMods;
-		final List<ModCandidateImpl> uniqueSelectedMods;
-
-		final List<ModCandidateImpl> addedMods = new ArrayList<>();
-		final List<ModCandidateImpl> currentSelectedMods = new ArrayList<>();
-
-		public ResolutionContext(Collection<ModCandidateImpl> candidates,
-				EnvType envType, Map<String, DynamicFunction> expressionFunctions,
-				Map<String, Set<ModCandidateImpl>> envDisabledMods,
-				PhaseSelectHandler phaseSelectHandler) {
-			this.initialMods = candidates;
-			this.envType = envType;
-			this.expressionFunctions = expressionFunctions;
-			this.envDisabledMods = envDisabledMods;
-			this.phaseSelectHandler = phaseSelectHandler;
-
-			this.allModsSorted = new ArrayList<>(candidates.size());
-			this.selectedMods = new HashMap<>(candidates.size());
-			this.uniqueSelectedMods = new ArrayList<>(candidates.size());
-
-			expressionFunctions.put("mod", new DynamicFunction() {
-				@Override
-				public Object evaluate(Object... args) throws ExpressionEvaluateException {
-					ExpressionFunctions.checkString1(args);
-
-					return selectedMods.containsKey(args[0]) ? true : null;
-				}
-			});
-		}
-
-		public Collection<ModCandidateImpl> getMods(String id) {
-			List<ModCandidateImpl> ret = new ArrayList<>();
-			ret.addAll(modsById.getOrDefault(id, Collections.emptyList()));
-			ModCandidateImpl mod = selectedMods.get(id);
-			if (mod != null) ret.add(mod);
-
-			for (ModCandidateImpl m : addedMods) {
-				if (m.getId().equals(id)) ret.add(m);
-			}
-
-			return ret;
-		}
-
-		public Collection<ModCandidateImpl> getMods() {
-			List<ModCandidateImpl> ret = new ArrayList<>(allModsSorted.size() + uniqueSelectedMods.size() + addedMods.size());
-			ret.addAll(allModsSorted);
-			ret.addAll(uniqueSelectedMods);
-			ret.addAll(addedMods);
-
-			return ret;
-		}
-
-		public boolean addMod(ModCandidateImpl mod) {
-			for (ModCandidateImpl m : modsById.getOrDefault(mod.getId(), Collections.emptyList())) {
-				if (m == mod || m.getVersion().equals(mod.getVersion())) {
-					return false;
-				}
-			}
-
-			if (selectedMods.containsKey(mod.getId())) return false;
-
-			for (ModCandidateImpl m : addedMods) {
-				if (m == mod || m.getId().equals(mod.getId()) && m.getVersion().equals(mod.getVersion())) {
-					return false;
-				}
-			}
-
-			addedMods.add(mod);
-
-			for (ModCandidate m : mod.getContainedMods()) {
-				addMod((ModCandidateImpl) m);
-			}
-
-			return true;
-		}
-
-		public boolean removeMod(ModCandidateImpl mod) {
-			if (selectedMods.get(mod.getId()) == mod) return false; // already loaded
-
-			if (!mod.getContainedMods().isEmpty()) { // also remove all mods that'd become orphaned (check if possible first, then apply)
-				Set<ModCandidateImpl> modsToRemove = Collections.newSetFromMap(new IdentityHashMap<>());
-				modsToRemove.add(mod);
-				Queue<ModCandidateImpl> queue = new ArrayDeque<>();
-				ModCandidateImpl parent = mod;
-
-				do {
-					for (ModCandidateImpl m : parent.getContainedMods()) {
-						if ((m.getContainingMods().size() == 1 || modsToRemove.containsAll(m.getContainingMods())) // orphaned
-								&& modsToRemove.add(m)) {
-							if (selectedMods.get(m.getId()) == m) return false;
-							queue.add(m);
-						}
-					}
-				} while ((parent = queue.poll()) != null);
-
-				for (ModCandidateImpl m : modsToRemove) {
-					if (m != mod) removeMod0(m);
-				}
-			}
-
-			return removeMod0(mod);
-		}
-
-		private boolean removeMod0(ModCandidateImpl mod) {
-			String id = mod.getId();
-			List<ModCandidateImpl> mods = modsById.get(id);
-			boolean removed = mods != null && mods.remove(mod) // remove from candidates
-					|| addedMods.remove(mod); // remove from pending additions if not already in candidates
-
-			if (removed) {
-				// remove parent refs
-				for (ModCandidateImpl m : mod.getContainingMods()) {
-					m.getContainedMods().remove(mod);
-				}
-
-				// remove child refs
-				for (ModCandidateImpl m : mod.getContainedMods()) {
-					m.getContainingMods().remove(mod);
-				}
-
-				// remove from sorted candidate list
-				allModsSorted.remove(mod);
-
-				// discard empty by-id refs
-				if (mods.isEmpty()) modsById.remove(id);
-			}
-
-			return removed;
-		}
 	}
 
 	public interface PhaseSelectHandler {

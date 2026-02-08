@@ -138,7 +138,7 @@ public final class Knot extends FabricLauncherBase {
 		// Setup classloader
 		// TODO: Provide KnotCompatibilityClassLoader in non-exclusive-Fabric pre-1.13 environments?
 		boolean useCompatibility = provider.requiresUrlClassLoader() || SystemProperties.isSet(SystemProperties.USE_COMPAT_CL);
-		classLoader = KnotClassLoaderInterface.create(useCompatibility, isDevelopment(), envType, provider);
+		classLoader = KnotClassLoaderInterface.create(useCompatibility, isDevelopment(), envType);
 		ClassLoader cl = classLoader.getClassLoader();
 		Thread.currentThread().setContextClassLoader(cl);
 
@@ -170,7 +170,7 @@ public final class Knot extends FabricLauncherBase {
 	private GameProvider createGameProvider(String[] args) {
 		// fast path with direct lookup
 
-		GameProvider embeddedGameProvider = findEmbedddedGameProvider();
+		GameProvider embeddedGameProvider = findEmbeddedGameProvider();
 
 		if (embeddedGameProvider != null
 				&& embeddedGameProvider.isEnabled()
@@ -219,7 +219,7 @@ public final class Knot extends FabricLauncherBase {
 	 *
 	 * <p>This is faster than going through service loader because it only looks at a single jar.
 	 */
-	private static GameProvider findEmbedddedGameProvider() {
+	private static GameProvider findEmbeddedGameProvider() {
 		try {
 			Path flPath = UrlUtil.getCodeSource(Knot.class);
 			if (flPath == null || !flPath.getFileName().toString().endsWith(".jar")) return null; // not a jar
@@ -295,6 +295,13 @@ public final class Knot extends FabricLauncherBase {
 
 		classLoader.setAllowedPrefixes(path, allowedPrefixes);
 		classLoader.addCodeSource(path);
+	}
+
+	@Override
+	public void reserveToClassPath(Path path) {
+		Log.debug(LogCategory.KNOT, "Reserving " + path + " to classpath.");
+
+		classLoader.reserveCodeSource(path);
 	}
 
 	@Override

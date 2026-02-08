@@ -179,6 +179,11 @@ public abstract class FabricTweaker extends FabricLauncherBase implements ITweak
 	}
 
 	@Override
+	public void reserveToClassPath(Path path) {
+		// not implemented (no-op)
+	}
+
+	@Override
 	public void setValidParentClassPath(Collection<Path> paths) {
 		// not implemented (no-op)
 	}
