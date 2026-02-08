@@ -32,6 +32,7 @@ public interface FabricLauncher {
 	IMixinTransformer getMixinTransformer();
 
 	void addToClassPath(Path path, String... allowedPrefixes);
+	void reserveToClassPath(Path path);
 	void setAllowedPrefixes(Path path, String... prefixes);
 	void setValidParentClassPath(Collection<Path> paths);
 

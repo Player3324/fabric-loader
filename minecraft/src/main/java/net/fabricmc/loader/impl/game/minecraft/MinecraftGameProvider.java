@@ -135,7 +135,7 @@ public class MinecraftGameProvider implements GameProvider {
 
 	@Override
 	public String getEntrypoint() {
-		return entrypoint;
+		return entrypoint.replace(".", "/");
 	}
 
 	@Override
@@ -367,12 +367,18 @@ public class MinecraftGameProvider implements GameProvider {
 			for (int i = 0; i < gameJars.size(); i++) {
 				Path newJar = obfJars.get(names[i]);
 				Path oldJar = gameJars.set(i, newJar);
+				launcher.reserveToClassPath(newJar);
 
 				if (logJars.remove(oldJar)) logJars.add(newJar);
 			}
 
 			realmsJar = obfJars.get("realms");
+		} else { // game is deobfuscated
+			gameJars.forEach(launcher::reserveToClassPath);
 		}
+
+		if (realmsJar != null) launcher.reserveToClassPath(realmsJar);
+		miscGameLibraries.forEach(launcher::reserveToClassPath);
 
 		// Load the logger libraries on the platform CL when in a unit test
 		if (!logJars.isEmpty() && !Boolean.getBoolean(SystemProperties.UNIT_TEST)) {

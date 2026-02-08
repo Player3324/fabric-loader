@@ -24,6 +24,7 @@ import java.io.InputStream;
 import java.net.JarURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.URLClassLoader;
 import java.net.URLConnection;
 import java.nio.ByteBuffer;
 import java.nio.file.FileSystemNotFoundException;
@@ -48,7 +49,6 @@ import java.util.zip.ZipFile;
 
 import net.fabricmc.api.EnvType;
 import net.fabricmc.loader.impl.FabricLoaderImpl;
-import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.FabricLauncherBase;
 import net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.ClassLoaderAccess;
 import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
@@ -81,12 +81,28 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		}
 	}
 
+	static final class UrlResourceLoader extends URLClassLoader implements ResourceLoaderAccess {
+		UrlResourceLoader(ClassLoader parent) {
+			super(new URL[0], parent);
+		}
+
+		@Override
+		public void addUrlFwd(URL url) {
+			super.addURL(url);
+		}
+
+		@Override
+		public URL findResourceFwd(String name) {
+			return super.findResource(name);
+		}
+	}
+
 	private static final ClassLoader PLATFORM_CLASS_LOADER = getPlatformClassLoader();
 
 	private final Map<Path, Metadata> metadataCache = new ConcurrentHashMap<>();
 	private final T classLoader;
 	private final ClassLoader parentClassLoader;
-	private final GameProvider provider;
+	private final ResourceLoaderAccess resourceAccess;
 	private final boolean isDevelopment;
 	private final EnvType envType;
 	private volatile Set<Path> codeSources = Collections.emptySet();
@@ -97,12 +113,12 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	private static final Collection<Path> JVM_NATIVE_DIRS = computeJvmNativeDirs();
 	private static final Map<String, String> PROCESSED_NATIVES = new HashMap<>();
 
-	KnotClassDelegate(boolean isDevelopment, EnvType envType, T classLoader, ClassLoader parentClassLoader, GameProvider provider) {
+	KnotClassDelegate(boolean isDevelopment, EnvType envType, T classLoader, ClassLoader parentClassLoader) {
 		this.isDevelopment = isDevelopment;
 		this.envType = envType;
 		this.classLoader = classLoader;
 		this.parentClassLoader = parentClassLoader;
-		this.provider = provider;
+		this.resourceAccess = new UrlResourceLoader(parentClassLoader);
 	}
 
 	@Override
@@ -126,12 +142,27 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		}
 
 		try {
-			classLoader.addUrlFwd(UrlUtil.asUrl(path));
+			URL url = UrlUtil.asUrl(path);
+			resourceAccess.addUrlFwd(url);
+			classLoader.addUrlFwd(url);
 		} catch (MalformedURLException e) {
 			throw new RuntimeException(e);
 		}
 
 		if (LOG_CLASS_LOAD_ERRORS) Log.info(LogCategory.KNOT, "added code source %s", path);
+	}
+
+	@Override
+	public void reserveCodeSource(Path path) {
+		path = LoaderUtil.normalizeExistingPath(path);
+
+		try {
+			resourceAccess.addUrlFwd(UrlUtil.asUrl(path));
+		} catch (MalformedURLException e) {
+			throw new RuntimeException(e);
+		}
+
+		if (LOG_CLASS_LOAD_ERRORS) Log.info(LogCategory.KNOT, "reserved code source %s", path);
 	}
 
 	@Override
@@ -244,7 +275,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 	}
 
 	/**
-	 * Check if an url is loadable by the parent class loader.
+	 * Check if a url is loadable by the parent class loader.
 	 *
 	 * <p>This handles explicit parent url whitelisting by {@link #validParentCodeSources} or shadowing by {@link #codeSources}
 	 */
@@ -455,7 +486,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 
 	private byte[] getRawClassByteArray(String name, boolean allowFromParent) throws IOException {
 		name = LoaderUtil.getClassFileName(name);
-		URL url = classLoader.findResourceFwd(name);
+		URL url = resourceAccess.findResourceFwd(name);
 
 		if (url == null) {
 			if (!allowFromParent) return null;
@@ -463,7 +494,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 			url = parentClassLoader.getResource(name);
 
 			if (!isValidParentUrl(url, name)) {
-				if (LOG_CLASS_LOAD) Log.info(LogCategory.KNOT, "refusing to load class %s at %s from parent class loader", name, url != null ? getCodeSource(url, name) : "null");
+				if (LOG_CLASS_LOAD) Log.info(LogCategory.KNOT, "refusing to get byte array of class %s at %s from parent class loader", name, url != null ? getCodeSource(url, name) : "null");
 
 				return null;
 			}
@@ -505,10 +536,7 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		}
 	}
 
-	interface ClassLoaderAccess {
-		void addUrlFwd(URL url);
-		URL findResourceFwd(String name);
-
+	interface ClassLoaderAccess extends ResourceLoaderAccess {
 		Package getPackageFwd(String name);
 		Package definePackageFwd(String name, String specTitle, String specVersion, String specVendor, String implTitle, String implVersion, String implVendor, URL sealBase) throws IllegalArgumentException;
 
@@ -516,6 +544,11 @@ final class KnotClassDelegate<T extends ClassLoader & ClassLoaderAccess> impleme
 		Class<?> findLoadedClassFwd(String name);
 		Class<?> defineClassFwd(String name, ByteBuffer data, CodeSource cs);
 		void resolveClassFwd(Class<?> cls);
+	}
+
+	interface ResourceLoaderAccess {
+		void addUrlFwd(URL url);
+		URL findResourceFwd(String name);
 	}
 
 	private static Collection<Path> computeJvmNativeDirs() {

@@ -38,6 +38,7 @@ import java.util.function.Function;
 import org.jetbrains.annotations.VisibleForTesting;
 import org.objectweb.asm.Opcodes;
 
+import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.classtweaker.api.ClassTweaker;
 import net.fabricmc.classtweaker.api.ClassTweakerReader;
@@ -67,7 +68,6 @@ import net.fabricmc.loader.impl.metadata.DependencyOverrides;
 import net.fabricmc.loader.impl.metadata.EntrypointMetadata;
 import net.fabricmc.loader.impl.metadata.LoaderModMetadata;
 import net.fabricmc.loader.impl.metadata.VersionOverrides;
-import net.fabricmc.loader.impl.transformer.ClassTransformHandler;
 import net.fabricmc.loader.impl.util.DefaultLanguageAdapter;
 import net.fabricmc.loader.impl.util.ExceptionUtil;
 import net.fabricmc.loader.impl.util.Expression;

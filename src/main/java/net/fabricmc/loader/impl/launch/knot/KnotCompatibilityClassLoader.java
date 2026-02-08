@@ -22,15 +22,14 @@ import java.nio.ByteBuffer;
 import java.security.CodeSource;
 
 import net.fabricmc.api.EnvType;
-import net.fabricmc.loader.impl.game.GameProvider;
 import net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.ClassLoaderAccess;
 
 class KnotCompatibilityClassLoader extends URLClassLoader implements ClassLoaderAccess {
 	private final KnotClassDelegate<KnotCompatibilityClassLoader> delegate;
 
-	KnotCompatibilityClassLoader(boolean isDevelopment, EnvType envType, GameProvider provider) {
+	KnotCompatibilityClassLoader(boolean isDevelopment, EnvType envType) {
 		super(new URL[0], KnotCompatibilityClassLoader.class.getClassLoader());
-		this.delegate = new KnotClassDelegate<>(isDevelopment, envType, this, getParent(), provider);
+		this.delegate = new KnotClassDelegate<>(isDevelopment, envType, this, getParent());
 	}
 
 	KnotClassDelegate<?> getDelegate() {
